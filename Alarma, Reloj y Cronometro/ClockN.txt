@@ -1,0 +1,272 @@
+;Checar direcciones de memoria para poder usar clock interno
+;; Copia de una cadena de caracteres que termina en 0h a la Ram externa y despues comprueba si esta ahi
+;; PTR_RAM almacena la direccion desde donde se va a empezar a leer/escribir
+;LEER UN MENSAJE DE LA ROM y lo envia a RAM Externa
+;; RAM se conecta a Y4 del 138
+;PARA LA RAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM
+
+
+;; Direcciones de RAM van desde 8000H a 9FFFH
+
+
+;****************INICIALIZACION****************
+	;PTR_RAM EQU 8000H ;DIRECCION DONDE EMPIEZA LA RAM
+	;RAMI EQU 020H ;DIRECCION DONDE EMPIEZA LA RAM EXTERNA
+;	MENSAJE EQU 0032H ;DIRECCION DE LA ROM	 
+	CONT1 EQU 032H
+	CONT2 EQU 033H
+	;VARIABLES PARA VALORES
+	SEG EQU 034H
+	MIN EQU 035H
+	HOR EQU 036H
+	;VARIABLES PARA PARTES DEL TIEMPO
+	UNS EQU 037H 
+	DES EQU 038H
+	UNM EQU 039H 
+	DEM EQU 03AH
+	UNH EQU 03BH
+	DEH EQU 03CH
+	;VARIABLES PARA CAMBIO
+	VAR1 EQU 03DH
+	VAR2 EQU 03EH
+	;AUXILIARES
+	AUX EQU 03FH
+	;VARIABLES DE LA HORA
+	HORI EQU 040H 
+	MINI EQU 041H
+
+	VAR3 EQU 042H
+;**************************MAIN**************************
+	ORG 0H
+	MOV SP, #20H
+	;VARIABLES PARA LA HORA
+	MOV HORI, #03h
+	MOV MINI, #28h
+	;**************
+	;ACALL INIT_CLOCK
+	ACALL INIT_LCD
+	FUNCION:
+	ACALL COPIARD
+	ACALL DATO
+	JMP FUNCION
+	;SJMP COPIARMEN
+
+;********************************************************
+INIT_CLOCK:
+	MOV DPTR, #9FF8h ;DIRECCION DE CONTROL DE RELOJ DE LA RAM
+	MOVX A, @DPTR ;LEER REGISTRO CTRL
+	PUSH ACC
+	ORL A, #80h ;ACC.7 = 1 
+	MOVX @DPTR, A
+	;*****************ACTUALIZAR RELOJ***********************
+	;CONVERTIR VARIABLES A BCD
+	MOV A, HORI
+	MOV VAR3, A;MANDAR A VAR3 EL VALOR A CONVERTIR
+	ACALL BCD
+	MOV HORI,VAR2
+
+	MOV A, MINI
+	MOV VAR3, A;MANDAR A VAR3 EL VAOR A CONVERTIR
+	ACALL BCD
+	MOV MINI,VAR2
+
+	;*************************
+	;DAR DATOS DE LA DIRECCION DE LOS SEGUNDOS
+	MOV A, #0
+        MOV DPL, #0F9h
+	MOV DPH, #9Fh  ;Se pone el puntero en la direccion de la RAM
+	MOVX @DPTR, A
+	;DAR DATOS DE LA DIRECCION DE LOS MINUTOS
+	MOV A, MINI
+	MOV DPL, #0FAh
+	MOV DPH, #9Fh
+	MOVX @DPTR, A
+	;DAR DATOS DE LA DIRECCION DE LAS HORAS
+	MOV A, HORI
+	MOV DPL, #0FBh
+	MOV DPH, #9Fh
+	MOVX @DPTR, A
+
+	;********************************************************
+	MOV DPTR, #9FF8h	
+	POP ACC
+	MOVX @DPTR, A
+	
+	RET
+
+;***************************************************
+
+DELAY:
+	MOV CONT1, #5
+RETA1:	MOV	CONT2,#255
+RETA2:	DJNZ	CONT2,RETA2
+	DJNZ	CONT1,RETA1
+	RET
+
+
+INIT_LCD: MOV R7, #3h
+FUN:   	MOV DPTR, #0F000H 
+   	MOV A, #38h	;FUNCTION SET
+   	MOVX @DPTR, A
+   	ACALL DELAY ;IMPLEMENTAR PARA 100Ms
+   	DJNZ R7, FUN
+        
+	MOV A, #0FH	;DISPLAY ON / OFF
+	MOVX @DPTR, A	
+	MOV A, #6H	;ENTRY MODE SET
+	MOVX @DPTR, A
+	MOV A, #14H
+	MOVX @DPTR, A	;CURSOR/DISPLAY SHIFT
+
+	RET
+
+DATO:
+ CALL ASCIICONV ;PRIMERO CONVIERTE
+ CALL MANDARLCD ;LUEGO MUESTRA
+ RET
+
+MANDARLCD:
+ CALL HOME
+ MOV DPTR, #0F100H
+
+ ;HORAS
+ MOV A, UNH
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ MOV A, DEH
+ MOVX @DPTR, A
+ ACALL DELAY
+	
+ ;******DOSPUNTOS
+ MOV A, #3Ah
+ MOVX @DPTR, A
+ ACALL DELAY
+ ;***************
+
+ ;MINUTOS
+ MOV A, UNM
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ MOV A, DEM
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ ;******DOSPUNTOS
+ MOV A, #3Ah
+ MOVX @DPTR, A
+ ACALL DELAY
+ ;***************
+
+ ;SEGUNDOS
+ MOV A, UNS
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ MOV A, DES
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ RET
+;****************************ASCIICONV*********************************
+ASCIICONV:
+ ;**************************SEGUNDOS
+ MOV A, SEG
+ ;DA A
+ MOV B, A
+ ANL A, #0F0H
+ RRC A
+ RRC A
+ RRC A
+ RRC A
+ ADD A, #30H ;CONVIERTE A ASCII
+ MOV UNS, A ;PRIMER DIGITO
+ MOV A,B
+ ANL A, #0FH
+ ADD A, #30H
+ MOV DES, A ;SEGUNDO DIGITO
+ ;***************************MINUTOS
+ MOV A, MIN
+ ;DA A
+ MOV B, A
+ ANL A, #0F0H
+ RRC A
+ RRC A
+ RRC A
+ RRC A
+ ADD A, #30H ;CONVIERTE A ASCII
+ MOV UNM, A ;PRIMER DIGITO
+ MOV A,B
+ ANL A, #0FH
+ ADD A, #30H
+ MOV DEM, A ;SEGUNDO DIGITO
+ ;*****************************HORAS
+ MOV A, HOR
+ ;DA A
+ MOV B, A
+ ANL A, #0F0H
+ RRC A
+ RRC A
+ RRC A
+ RRC A
+ ADD A, #30H ;CONVIERTE A ASCII
+ MOV UNH, A ;PRIMER DIGITO
+ MOV A,B
+ ANL A, #0FH
+ ADD A, #30H
+ MOV DEH, A ;SEGUNDO DIGITO
+ ;**********************************
+ RET
+
+;********************************HOME**********************************
+HOME:
+ MOV DPTR, #0F000H
+ MOV A, #02H ;HOME
+ MOVX @DPTR, A
+ CALL DELAY
+ RET
+;*******************************COPIARD********************************
+COPIARD:
+	;Copiar a direcciones de Ram interna los valores del reloj
+	MOV A, #0
+	;LEER DATOS DE LA DIRECCION DE LOS SEGUNDOS
+        MOV DPL, #0F9h
+	MOV DPH, #9Fh  ;Se pone el puntero en la direccion de la RAM
+	MOVX A, @DPTR
+	MOV SEG, A
+	;LEER DATOS DE LA DIRECCION DE LOS MINUTOS
+	MOV DPL, #0FAh
+	MOV DPH, #9Fh
+	MOVX A, @DPTR
+	MOV MIN, A
+	;LEER DATOS DE LA DIRECCION DE LAS HORAS
+	MOV DPL, #0FBh
+	MOV DPH, #9Fh
+	MOVX A, @DPTR
+	MOV HOR, A
+	RET
+;********************************HEX2BC********************************
+	BCD:
+	 MOV A, VAR3
+	 MOV VAR1, #00h
+	 MOV VAR2, #00h
+	 CLR C
+	 MOV B, #100
+	 DIV AB
+	 MOV VAR1, A
+	 CLR C
+	 MOV A, B
+	 MOV B, #10
+	 DIV AB
+	 SWAP A
+	 MOV VAR2, A
+	 MOV A, B
+	 ORL A, VAR2
+	 MOV VAR2, A
+	 MOV VAR3, #00h
+	 MOV B, VAR2
+	 ;MOV R0, VAR2
+	 RET
+;**********************************************************************
+	END

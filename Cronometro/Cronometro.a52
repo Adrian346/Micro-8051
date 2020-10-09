@@ -1,0 +1,473 @@
+NAME	PROYECTO
+;--------------------------------- VARIABLES -------------------------------------
+
+TIMER			EQU	20H
+CONTADOR		EQU	34H
+CRONOMETRO		EQU	35H
+MINUTOS_CRON		EQU	36H
+SEGUNDOS_CRON		EQU	37H
+
+
+
+;--------------------------- VECTOR DE INTERRUPCIONES ----------------------------
+	ORG	00H
+		AJMP	RESET
+	ORG	03H
+		AJMP	INTE0
+	ORG	0BH
+		AJMP	TOV0
+	ORG	13H
+		AJMP	INTE1
+	ORG	1BH
+		AJMP	TOV1
+	ORG	23H
+		AJMP	UART
+	ORG	2BH
+		AJMP	TOV2
+;-------------------------------- RUTINA DE CONFIGURACION ------------------------
+	ORG	33H
+RESET:	MOV   	81h,#07h
+	MOV TH0, #0xD8		;Le asigna a TH0 D8 para el timer
+	MOV TL0, #0xCC		;Le asigna a TLO CC para el timer 	
+	MOV TMOD, #0x11		;Le asigna a TMOD 11 para el timer
+	SETB ET0
+	SETB EA
+	SETB TR0
+	MOV TIMER, #14		;Inicializa el timer en 14
+	MOV	MINUTOS_CRON, #0H
+	MOV	SEGUNDOS_CRON, #0H
+	MOV	CRONOMETRO, #2
+	AJMP MAIN
+;-------------------------------- PROGRAMA PRINCIPAL -----------------------------
+MAIN:
+	ACALL 	SACAR_VALOR_DISPLAY_HORAS      
+	ACALL	SACAR_VALOR_DISPLAY_MINUTOS 	
+	ACALL	RETARDO
+	ACALL	BOTONES
+	AJMP	MAIN
+
+ 	
+;------------------------------ INICIO DE INTERRUPCIONES --------------------------
+INTE0:	RETI
+TOV0:	
+	ACALL MENU_CRONOMETRO
+SEGUNDO:
+	DJNZ TIMER, NO		;Mientras el timer sea diferente de 0 decrementa 1 y manda llamar a NO
+	ACALL	AUMENTAR	;Timer llego a 0 y paso un seungo por lo tanto manda llamar a AUMENTAR donde incrementa un segundo
+REGRESAR_TIMER:			
+	MOV TIMER, #14		;A timer le vuelve a asignar el 14 para que empiece la cuenta otra vez y pase un segundo
+
+NO:	RETI
+INTE1:	RETI
+TOV1:	RETI
+UART:	RETI
+TOV2:	RETI
+
+
+;--------------------------------- INICIO DE SUBRUTINAS ---------------------------
+
+MENU_CRONOMETRO:
+	MOV	A, CRONOMETRO
+	CJNE	A, #1, PAUSE_MENU
+RET
+PAUSE_MENU:
+	CJNE	A, #2, STOP_MENU
+	MOV	TIMER, #14
+RET
+STOP_MENU:
+	MOV	R0, #0
+	MOV	MINUTOS_CRON, #0H
+	MOV	R3, #0
+	MOV	SEGUNDOS_CRON, #0H
+RET
+
+
+RETARDO:	
+       MOV R6,#200		;A R6 le asigna 200     
+RETA1: MOV CONTADOR,#20      	;A CONTADOR le asigna 20
+RETA2:   
+    MOV P2, #0xFE             ;Prende el primer display	
+    ACALL COMPARAR1           ;Llama la funcion COMPARAR1 donde compara el cociente de las horas (el primer numero)
+    MOV P0, #0xFF	      ;Limpia P0 (para que se muestren bien los numeros)
+    MOV P2, #0xFF             ;Apaga el display
+
+    MOV P2, #0xFD	      ;Prende el segundo display	    
+    ACALL COMPARAR2	      ;Llama la funcion COMPARAR2 donde compara el residuo de las horas (el segundo numero)	
+    MOV P0, #0xFF	      ;Limpia P0 (para que se muestren bien los numeros)
+    MOV P2, #0xFF             ;Apaga el display
+
+    MOV P2, #0xFB	      ;Prende el tercer display	    
+    ACALL COMPARAR3	      ;Llama la funcion COMPARAR3 donde compara el cociente de los minutos (el tercer numero)	
+    MOV P0, #0xFF	      ;Limpia P0 (para que se muestren bien los numeros)
+    MOV P2, #0xFF             ;Apaga el display
+
+    MOV P2, #0xF7	      ;Prende el cuarto display	    
+    ACALL COMPARAR4	      ;Llama la funcion COMPARAR4 donde compara el residuo de los minutos (el cuarto numero)	
+    MOV P0, #0xFF	      ;Limpia P0 (para que se muestren bien los numeros)
+    MOV P2, #0xFF             ;Apaga el display
+	
+    DJNZ CONTADOR,RETA2     	      ;Decrementa CONTADOR mientras sea diferente de cero y mientras sea diferente de 0 manda llamar la funcion RETA2
+    DJNZ R6,RETA1 	              ;Decrementa R6 mientras sea diferente de cero y mientras sea diferente de 0 manda llamar la funcion RETA1
+
+RET	
+
+SACAR_VALOR_DISPLAY_HORAS:
+	MOV A, MINUTOS_CRON	;a A le asigna lo que tiene horas
+	MOV B, #10	;a B le asgina un valor de 10	
+	DIV AB		;Divide horas entre 10, A obtiene el cociente y B el residuo
+	MOV R2, B	;a R2 le asigna el residuo
+	MOV R1, A	;a R1 le asgina el cociente		
+RET			
+SACAR_VALOR_DISPLAY_MINUTOS:
+	MOV A, SEGUNDOS_CRON	;a A le asigna lo que tiene horas
+	MOV B, #10	;a B le asgina un valor de 10	
+	DIV AB		;Divide horas entre 10, A obtiene el cociente y B el residuo
+	MOV R5, B	;a R5 le asigna el residuo
+	MOV R4, A	;a R4 le asgina el cociente		
+RET			
+COMPARAR1:			
+C10:				
+	CJNE	R1, #0, C11	;Si el cociente de las horas no es cero manda llamar la siguiente funcion donde pregunta por 1
+	ACALL CERO		;Si el cociente es 0 manda llamar la funcion 0 donde asigna a P0 el valor para 0		
+	RET		
+			
+C11:
+	CJNE	R1, #1, C12	;Si el cociente de las horas no es 1 manda llamar la siguiente funcion donde pregunta por 2
+	ACALL UNO		;Si el cociente es 1 manda llamar la funcion 1 donde asigna a P0 el valor para 1
+	RET
+C12:
+	CJNE	R1, #2, C13	;Si el cociente de las horas no es 2 manda llamar la siguiente funcion donde pregunta por 3
+	ACALL DOS		;Si el cociente es 2 manda llamar la funcion 2 donde asigna a P0 el valor para 2		
+	RET
+C13:
+	CJNE	R1, #3, C14	;Si el cociente de las horas no es 3 manda llamar la siguiente funcion donde pregunta por 4
+	ACALL TRES		;Si el cociente es 3 manda llamar la funcion 3 donde asigna a P0 el valor para 3		
+	RET
+C14:
+	CJNE	R1, #4, C15	;Si el cociente de las horas no es 4 manda llamar la siguiente funcion donde pregunta por 5
+	ACALL CUATRO		;Si el cociente es 4 manda llamar la funcion 4 donde asigna a P0 el valor para 4		
+	RET
+C15:
+	CJNE	R1, #5, C16	;Si el cociente de las horas no es 5 manda llamar la siguiente funcion donde pregunta por 6
+	ACALL CINCO		;Si el cociente es 5 manda llamar la funcion 5 donde asigna a P0 el valor para 5		
+	RET
+C16:
+	CJNE	R1, #6, C17	;Si el cociente de las horas no es 6 manda llamar la siguiente funcion donde pregunta por 7
+	ACALL SEIS		;Si el cociente es 6 manda llamar la funcion 6 donde asigna a P0 el valor para 6		
+	RET
+C17:
+	CJNE	R1, #7, C18	;Si el cociente de las horas no es 7 manda llamar la siguiente funcion donde pregunta por 8
+	ACALL SIETE		;Si el cociente es 7 manda llamar la funcion 7 donde asigna a P0 el valor para 7		
+	RET
+C18:
+	CJNE	R1, #8, C19	;Si el cociente de las horas no es 8 manda llamar la siguiente funcion donde manda llamar el 9 en el display
+	ACALL OCHO		;Si el cociente es 8 manda llamar la funcion 8 donde asigna a P0 el valor para 8		
+	RET
+C19:
+	ACALL NUEVE 		;Manda llamar la funcion 9 donde asigna a P0 el valor para 9		
+	RET
+RET
+COMPARAR2:
+C20:
+	CJNE	R2, #0, C21
+	ACALL CERO1		;Si el cociente es 0 manda llamar la funcion CERO1 donde asigna a P0 el valor para 0.
+	RET
+C21:
+	CJNE	R2, #1, C22
+	ACALL UNO1
+	RET
+C22:
+	CJNE	R2, #2, C23
+	ACALL DOS1
+	RET
+C23:
+	CJNE	R2, #3, C24
+	ACALL TRES1
+	RET
+C24:
+	CJNE	R2, #4, C25
+	ACALL CUATRO1
+	RET
+C25:
+	CJNE	R2, #5, C26
+	ACALL CINCO1
+	RET
+C26:
+	CJNE	R2, #6, C27
+	ACALL SEIS1
+	RET
+C27:
+	CJNE	R2, #7, C28
+	ACALL SIETE1
+	RET
+C28:
+	CJNE	R2, #8, C29
+	ACALL OCHO1
+	RET
+C29:
+	ACALL NUEVE1
+	RET
+RET
+COMPARAR3:
+C30:
+	CJNE	R4, #0, C31
+	ACALL CERO
+	RET
+C31:
+	CJNE	R4, #1, C32
+	ACALL UNO
+	RET
+C32:
+	CJNE	R4, #2, C33
+	ACALL DOS
+	RET
+C33:
+	CJNE	R4, #3, C34
+	ACALL TRES
+	RET
+C34:
+	CJNE	R4, #4, C35
+	ACALL CUATRO
+	RET
+C35:
+	CJNE	R4, #5, C36
+	ACALL CINCO
+	RET
+C36:
+	CJNE	R4, #6, C37
+	ACALL SEIS
+	RET
+C37:
+	CJNE	R4, #7, C38
+	ACALL SIETE
+	RET
+C38:
+	CJNE	R4, #8, C39
+	ACALL OCHO
+	RET
+C39:
+	ACALL NUEVE
+	RET
+RET
+COMPARAR4:
+C40:
+	CJNE	R5, #0, C41
+	ACALL CERO
+	RET
+C41:
+	CJNE	R5, #1, C42
+	ACALL UNO
+	RET
+C42:
+	CJNE	R5, #2, C43
+	ACALL DOS
+	RET
+C43:
+	CJNE	R5, #3, C44
+	ACALL TRES
+	RET
+C44:
+	CJNE	R5, #4, C45
+	ACALL CUATRO
+	RET
+C45:
+	CJNE	R5, #5, C46
+	ACALL CINCO
+	RET
+C46:
+	CJNE	R5, #6, C47
+	ACALL SEIS
+	RET
+C47:
+	CJNE	R5, #7, C48
+	ACALL SIETE
+	RET
+C48:
+	CJNE	R5, #8, C49
+	ACALL OCHO
+	RET
+C49:
+	ACALL NUEVE
+	RET
+RET
+
+CERO:			
+	MOV A, #0xC0	;Mueve a A el valor para 0 en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET			
+UNO:
+	MOV A, #0xF9	;Mueve a A el valor para 1 en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+DOS: 
+	MOV A, #0xA4	;Mueve a A el valor para 2 en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+TRES: 
+	MOV A, #0xB0	;Mueve a A el valor para 3 en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+CUATRO: 
+	MOV A, #0x99	;Mueve a A el valor para 4 en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+CINCO: 
+	MOV A, #0x92	;Mueve a A el valor para 5 en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+SEIS: 
+	MOV A, #0x82	;Mueve a A el valor para 6 en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+SIETE: 
+	MOV A, #0xF8	;Mueve a A el valor para 7 en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+OCHO: 
+	MOV A, #0x80	;Mueve a A el valor para 8 en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+NUEVE: 
+	MOV A, #0x98	;Mueve a A el valor para 9 en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+
+
+CERO1:
+	MOV A, #0x40	;Mueve a A el valor para 0. en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+UNO1:
+	MOV A, #0x79	;Mueve a A el valor para 1. en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+DOS1: 
+	MOV A, #0x24	;Mueve a A el valor para 2. en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+TRES1: 
+	MOV A, #0x30	;Mueve a A el valor para 3. en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+CUATRO1: 
+	MOV A, #0x19	;Mueve a A el valor para 4. en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+CINCO1: 
+	MOV A, #0x12	;Mueve a A el valor para 5. en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+SEIS1: 
+	MOV A, #0x02	;Mueve a A el valor para 6. en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+SIETE1: 
+	MOV A, #0x78	;Mueve a A el valor para 7. en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+OCHO1: 
+	MOV A, #0x00	;Mueve a A el valor para 8. en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+NUEVE1: 
+	MOV A, #0x18	;Mueve a A el valor para 9. en el display
+	MOV P0, A	;Mueve a P0 lo que tiene A
+	RET
+
+
+
+AUMENTAR:
+	MOV 	A, SEGUNDOS_CRON
+	CJNE	A, #59, Incrementa_Segs	;Si los segundos son diferentes de 59 manda llamar a la funcion Incrementa_Segs
+	ACALL	MINS				;Si los segundos son 59 manda llamar a la funcion MINS
+RET
+
+
+Incrementa_Segs:
+	INC 	SEGUNDOS_CRON					;Incrementa un segundo 
+	AJMP	REGRESAR_TIMER			;Regresa al timer	
+RET
+
+Incrementa_Minutos:
+	INC	MINUTOS_CRON				;Incrementa un minuto
+	AJMP	REGRESAR_TIMER			;Regresa al timer
+RET
+
+MINS:
+	MOV	SEGUNDOS_CRON, #0				;A segundos lo mueve a 0 porque no pueden llegar a 60 
+	MOV	A, MINUTOS_CRON
+	CJNE	A, #59, Incrementa_Minutos	;Si los minutos son diferentes de 59 manda llamar a la funcion Incrementa_Minutos
+	ACALL	Reiniciar			;Si los minutos son igual a 59 manda llamar a la funcion Reiniciar
+RET
+
+Reiniciar:
+	MOV	SEGUNDOS_CRON, #0				
+	MOV 	MINUTOS_CRON, #0
+	AJMP	REGRESAR_TIMER			;Regresa al timer
+RET
+
+
+
+
+BOTONES:
+
+	JNB	P3.2, START1		;Si esta presionando el boton 3.3 manda llamar funcion FUNCION_RESTA_MINUTOS
+
+	JNB	P3.3, PAUSE1		;Si esta presionando el boton 3.4 manda llamar funcion FUNCION_AUMENTA_HORAS
+
+	JNB	P3.4, STOP1		;Si esta presionando el boton 3.5 manda llamar funcion FUNCION_RESTA_HORAS
+RET
+
+
+START1:
+	JB	P3.3, START2		;Si no esta presionando el boton 3.2 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+START2:
+	JB	P3.4, START3		;Si no esta presionando el boton 3.4 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+START3:
+	JB	P3.5, START		;Si no esta presionando el boton 3.5 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+START:
+	MOV	CRONOMETRO, #1
+RET
+
+
+PAUSE1:
+	JB	P3.2, PAUSE2		;Si no esta presionando el boton 3.2 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+PAUSE2:
+	JB	P3.4, PAUSE3		;Si no esta presionando el boton 3.4 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+PAUSE3:
+	JB	P3.5, PAUSE		;Si no esta presionando el boton 3.3 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+PAUSE:
+	MOV	CRONOMETRO, #2
+RET
+
+
+STOP1:
+	JB	P3.2, STOP2		;Si no esta presionando el boton 3.3 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+STOP2:
+	JB	P3.3, STOP3		;Si no esta presionando el boton 3.2 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+STOP3:
+	JB	P3.5, STOP		;Si no esta presionando el boton 3.5 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+	
+STOP:
+	MOV 	CRONOMETRO, #3
+RET
+
+
+END

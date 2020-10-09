@@ -1,0 +1,690 @@
+NAME 		MENU
+;***DECLARACION DE VARIABLES*******************
+;RELOJ
+SEG	EQU 030H
+MIN	EQU 031H
+HOR	EQU 032H
+
+UNS 	EQU 047H
+DES 	EQU 034H
+UNM 	EQU 035H
+DEM 	EQU 036H
+UNH 	EQU 037H
+DEH 	EQU 038H
+
+;OTRAS 
+
+VAR1	EQU 039H
+VAR2	EQU 03AH
+VAR3	EQU 03BH
+
+MINI	EQU 03CH
+HORI	EQU 03DH
+
+CONT1	EQU 03EH
+CONT2	EQU 03FH
+AUX 	EQU 040H
+
+TREH	EQU 041H
+MIN_BOTON	EQU 4AH
+HOR_BOTON	EQU 4BH
+
+
+;CRONOMETRO
+TIMER 		EQU 042H
+SEGUNDOS_CRON	EQU 043H
+MINUTOS_CRON	EQU 044H
+CRONOMETRO 	EQU 045H
+MODO		EQU 046H
+
+
+
+;--------------------------- VECTOR DE INTERRUPCIONES ----------------------------
+	ORG	00H
+		AJMP	RESET
+	ORG	03H
+		AJMP	INTE0
+	ORG	0BH
+		AJMP	TOV0
+	ORG	13H
+		AJMP	INTE1
+	ORG	1BH
+		AJMP	TOV1
+	ORG	23H
+		AJMP	UART
+	ORG	2BH
+		AJMP	TOV2
+;-------------------------------- RUTINA DE CONFIGURACION ------------------------
+	ORG	33H
+	MOV SP, #20H
+RESET:	
+	MOV MODO, #1
+	MOV TREH, #30h
+	MOV R0, #0H
+	MOV R1, #0H
+	ACALL INIT_LCD
+	MOV   	81h,#07h
+	MOV TH0, #0xD8		;Le asigna a TH0 D8 para el timer
+	MOV TL0, #0xCC		;Le asigna a TLO CC para el timer 	
+	MOV TMOD, #0x11		;Le asigna a TMOD 11 para el timer
+	SETB ET0
+	SETB EA
+	SETB TR0
+	MOV TIMER, #14		;Inicializa el timer en 14
+	MOV	MINUTOS_CRON, #0h
+	MOV	SEGUNDOS_CRON, #0h
+	MOV	CRONOMETRO, #2
+	MOV	R0,HOR_BOTON
+	MOV	R1,MIN_BOTON
+	AJMP MAIN
+
+;------------------------------------- MAIN --------------------------------------------
+
+MAIN:
+	ACALL 	MENU
+	ACALL 	DELAY
+	ACALL 	DELAY
+	ACALL 	COMP
+SJMP MAIN
+
+COMP:
+	JNB 	P3.5, INC_MODO
+RET
+
+;------------------------------ INICIO DE INTERRUPCIONES --------------------------
+INTE0:	RETI
+TOV0:	
+	ACALL MENU_CRONOMETRO
+SEGUNDO:
+	DJNZ TIMER, NO		;Mientras el timer sea diferente de 0 decrementa 1 y manda llamar a NO
+	ACALL	AUMENTAR	;Timer llego a 0 y paso un seungo por lo tanto manda llamar a AUMENTAR donde incrementa un segundo
+REGRESAR_TIMER:			
+	MOV TIMER, #14		;A timer le vuelve a asignar el 14 para que empiece la cuenta otra vez y pase un segundo
+
+NO:	RETI
+INTE1:	RETI
+TOV1:	RETI
+UART:	RETI
+TOV2:	RETI
+;-------------------------------------------------------------------------------
+
+RELOJ:
+	ACALL COPIARD
+	ACALL DATO
+RET
+
+OPCION_CRONOMETRO:
+	ACALL DELAY
+	ACALL DELAY
+	ACALL DELAY
+	ACALL DELAY
+	ACALL BOTONES_CRON
+	ACALL ASCIICONV_CRON
+	ACALL MANDARLCD_CRON
+RET
+
+AJUSTAR_RELOJ:
+	ACALL DELAY_BOTON
+	ACALL BOTONES_BOTON
+ 	MOV HOR_BOTON,R0
+ 	MOV MIN_BOTON,R1
+ 	ACALL ASCIICONV_BOTON
+ 	ACALL MANDARLCD_BOTON
+	MOV R0, HOR_BOTON
+	MOV R1, MIN_BOTON
+RET
+
+MENU:
+	MOV	A, MODO
+	CJNE	A, #1, MENU1
+	ACALL	RELOJ
+RET
+
+MENU1:
+	CJNE	A, #2, AJUSTAR_RELOJ
+	ACALL	OPCION_CRONOMETRO 
+RET
+
+INC_MODO:
+	MOV	A, MODO
+	CJNE	A, #3, INC_MODO1
+	MOV	MODO, #1
+RET
+INC_MODO1:
+	INC MODO
+	MOV A, MODO
+RET
+
+;--------------------------------- INICIO DE SUBRUTINAS ---------------------------
+
+;--------------------------------- AJUSTAR RELOJ --------------------------------
+
+BOTONES_BOTON:
+	JNB P3.2,AUMENTAMINUTOS_BOTON
+	JNB P3.3,AUMENTAHORAS_BOTON
+	JNB P3.4, DEFINIR_HORA
+RET
+
+DEFINIR_HORA:
+	;MOV HOR, HOR_BOTON;POSIBLE FALLO
+	;MOV MIN, MIN_BOTON;POSIBLE FALLO
+	MOV HORI, R0
+	MOV MINI, R1
+	ACALL INIT_CLOCK
+RET
+AUMENTAHORAS_BOTON:
+ ACALL DELAY_BOTON
+ CJNE	R0,#17H,INCREMENTARHORAS_BOTON
+ MOV	R0,#0
+RET
+
+INCREMENTARHORAS_BOTON:
+ INC	R0
+ RET
+
+AUMENTAMINUTOS_BOTON:
+ ACALL DELAY_BOTON
+ CJNE	R1,#3BH,INCREMENTAR_MINUTOS_BOTON
+ MOV 	R1,#0
+ CJNE 	R0, #17H, INCREMENTARHORAS_BOTON
+ MOV	R0, #0
+RET
+
+INCREMENTAR_MINUTOS_BOTON:
+ INC	R1
+RET
+
+MANDARLCD_BOTON:
+ CALL HOME
+ MOV DPTR, #0F100H
+
+ ;HORAS
+ MOV A, UNH
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ MOV A, DEH
+ MOVX @DPTR, A
+ ACALL DELAY
+	
+ ;******DOSPUNTOS
+ MOV A, #3Ah
+ MOVX @DPTR, A
+ ACALL DELAY
+ ;***************
+
+ ;MINUTOS
+ MOV A, UNM
+ MOVX @DPTR, A
+ MOV R7,UNM
+ ACALL DELAY
+
+ MOV A, DEM
+ MOVX @DPTR, A
+ MOV R6,DEM
+ ACALL DELAY
+
+ ;******DOSPUNTOS
+ MOV A, #3Ah
+ MOVX @DPTR, A
+ ACALL DELAY
+ ;***************
+
+ ;SEGUNDOS
+ MOV A, UNS
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ MOV A, DES
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ RET
+;****************************ASCIICONV*********************************
+ASCIICONV_BOTON:
+ ;**************************SEGUNDOS
+ MOV A, #0
+ DA A
+ MOV B, A
+ ANL A, #0F0H
+ CLR C
+ RRC A
+ RRC A
+ RRC A
+ RRC A
+ ADD A, #30H ;CONVIERTE A ASCII
+ MOV UNS, A ;PRIMER DIGITO
+ CLR C
+ MOV A,B
+ ANL A, #0FH
+ ADD A, #30H
+ MOV DES, A ;SEGUNDO DIGITO
+ ;***************************MINUTOS
+ MOV A, MIN_BOTON
+ CLR C
+ MOV B, #10
+ DIV AB
+ ORL A, TREH
+ MOV UNM, A
+ MOV A, B
+ ORL A, TREH
+ MOV DEM, A
+ ;*****************************HORAS
+ MOV A, HOR_BOTON
+ CLR C
+ MOV B, #10
+ DIV AB
+ ORL A, TREH
+ MOV UNH, A
+ MOV A, B
+ ORL A, TREH
+ MOV DEH, A
+ ;**********************************
+RET
+
+DELAY_BOTON:
+	MOV CONT1, #100
+RETA3:	MOV	CONT2,#255
+RETA4:	DJNZ	CONT2,RETA4
+	DJNZ	CONT1,RETA3
+	RET
+
+;------------------------------------ RELOJ --------------------------------------
+
+INIT_CLOCK:
+	MOV DPTR, #9FF8h ;DIRECCION DE CONTROL DE RELOJ DE LA RAM
+	MOVX A, @DPTR ;LEER REGISTRO CTRL
+	PUSH ACC
+	ORL A, #80h ;ACC.7 = 1 
+	MOVX @DPTR, A
+	;*****************ACTUALIZAR RELOJ***********************
+	;CONVERTIR VARIABLES A BCD
+	MOV A, HORI
+	MOV VAR3, A;MANDAR A VAR3 EL VALOR A CONVERTIR
+	ACALL BCD
+	MOV HORI,VAR2
+
+	MOV A, MINI
+	MOV VAR3, A;MANDAR A VAR3 EL VAOR A CONVERTIR
+	ACALL BCD
+	MOV MINI,VAR2
+
+	;*************************
+	;DAR DATOS DE LA DIRECCION DE LOS SEGUNDOS
+	MOV A, #0
+        MOV DPL, #0F9h
+	MOV DPH, #9Fh  ;Se pone el puntero en la direccion de la RAM
+	MOVX @DPTR, A
+	;DAR DATOS DE LA DIRECCION DE LOS MINUTOS
+	MOV A, MINI
+	MOV DPL, #0FAh
+	MOV DPH, #9Fh
+	MOVX @DPTR, A
+	;DAR DATOS DE LA DIRECCION DE LAS HORAS
+	MOV A, HORI
+	MOV DPL, #0FBh
+	MOV DPH, #9Fh
+	MOVX @DPTR, A
+
+	;********************************************************
+	MOV DPTR, #9FF8h	
+	POP ACC
+	MOVX @DPTR, A
+	
+	RET
+
+;***************************************************
+
+DELAY:
+	MOV CONT1, #25;;;;;
+RETA1:	MOV	CONT2,#255
+RETA2:	DJNZ	CONT2,RETA2
+	DJNZ	CONT1,RETA1
+	RET
+
+DATO:
+ CALL ASCIICONV_RELOJ ;PRIMERO CONVIERTE
+ CALL MANDARLCD_RELOJ ;LUEGO MUESTRA
+ RET
+
+MANDARLCD_RELOJ:
+ CALL HOME
+ MOV DPTR, #0F100H
+
+ ;HORAS
+ MOV A, UNH
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ MOV A, DEH
+ MOVX @DPTR, A
+ ACALL DELAY
+	
+ ;******DOSPUNTOS
+ MOV A, #3Ah
+ MOVX @DPTR, A
+ ACALL DELAY
+ ;***************
+
+ ;MINUTOS
+ MOV A, UNM
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ MOV A, DEM
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ ;******DOSPUNTOS
+ MOV A, #3Ah
+ MOVX @DPTR, A
+ ACALL DELAY
+ ;***************
+
+ ;SEGUNDOS
+ MOV A, UNS
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ MOV A, DES
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ RET
+;****************************ASCIICONV*********************************
+ASCIICONV_RELOJ:
+ ;**************************SEGUNDOS
+ MOV A, SEG
+ ;DA A
+ MOV B, A
+ ANL A, #0F0H
+ RRC A
+ RRC A
+ RRC A
+ RRC A
+ ADD A, #30H ;CONVIERTE A ASCII
+ MOV UNS, A ;PRIMER DIGITO
+ MOV A,B
+ ANL A, #0FH
+ ADD A, #30H
+ MOV DES, A ;SEGUNDO DIGITO
+ ;***************************MINUTOS
+ MOV A, MIN
+ ;DA A
+ MOV B, A
+ ANL A, #0F0H
+ RRC A
+ RRC A
+ RRC A
+ RRC A
+ ADD A, #30H ;CONVIERTE A ASCII
+ MOV UNM, A ;PRIMER DIGITO
+ MOV A,B
+ ANL A, #0FH
+ ADD A, #30H
+ MOV DEM, A ;SEGUNDO DIGITO
+ ;*****************************HORAS
+ MOV A, HOR
+ ;DA A
+ MOV B, A
+ ANL A, #0F0H
+ RRC A
+ RRC A
+ RRC A
+ RRC A
+ ADD A, #30H ;CONVIERTE A ASCII
+ MOV UNH, A ;PRIMER DIGITO
+ MOV A,B
+ ANL A, #0FH
+ ADD A, #30H
+ MOV DEH, A ;SEGUNDO DIGITO
+ ;**********************************
+ RET
+
+;*******************************COPIARD********************************
+COPIARD:
+	;Copiar a direcciones de Ram interna los valores del reloj
+	MOV A, #0
+	;LEER DATOS DE LA DIRECCION DE LOS SEGUNDOS
+        MOV DPL, #0F9h
+	MOV DPH, #9Fh  ;Se pone el puntero en la direccion de la RAM
+	MOVX A, @DPTR
+	MOV SEG, A
+	;LEER DATOS DE LA DIRECCION DE LOS MINUTOS
+	MOV DPL, #0FAh
+	MOV DPH, #9Fh
+	MOVX A, @DPTR
+	MOV MIN, A
+	;LEER DATOS DE LA DIRECCION DE LAS HORAS
+	MOV DPL, #0FBh
+	MOV DPH, #9Fh
+	MOVX A, @DPTR
+	MOV HOR, A
+RET
+;********************************HEX2BC********************************
+BCD:
+	 MOV A, VAR3
+	 MOV VAR1, #00h
+	 MOV VAR2, #00h
+	 CLR C
+	 MOV B, #100
+	 DIV AB
+	 MOV VAR1, A
+	 CLR C
+	 MOV A, B
+	 MOV B, #10
+	 DIV AB
+	 SWAP A
+	 MOV VAR2, A
+	 MOV A, B
+	 ORL A, VAR2
+	 MOV VAR2, A
+	 MOV VAR3, #00h
+	 MOV B, VAR2
+RET
+;**********************************************************************
+
+
+;------------------------------------ CRONOMETRO ------------------------------------------
+MENU_CRONOMETRO:
+	MOV	A, CRONOMETRO
+	CJNE	A, #1, PAUSE_MENU
+RET
+PAUSE_MENU:
+	CJNE	A, #2, STOP_MENU
+	MOV	TIMER, #14
+RET
+STOP_MENU:
+	MOV	MINUTOS_CRON, #0H
+	MOV	SEGUNDOS_CRON, #0H
+RET
+
+
+AUMENTAR:
+	MOV 	A, SEGUNDOS_CRON
+	CJNE	A, #3Bh, Incrementa_Segs	;Si los segundos son diferentes de 59 manda llamar a la funcion Incrementa_Segs
+	ACALL	MINS				;Si los segundos son 59 manda llamar a la funcion MINS
+RET
+
+
+Incrementa_Segs:
+	INC 	SEGUNDOS_CRON					;Incrementa un segundo 
+	AJMP	REGRESAR_TIMER			;Regresa al timer	
+RET
+
+Incrementa_Minutos:
+	INC	MINUTOS_CRON				;Incrementa un minuto
+	AJMP	REGRESAR_TIMER			;Regresa al timer
+RET
+
+MINS:
+	MOV	SEGUNDOS_CRON, #0h				;A segundos lo mueve a 0 porque no pueden llegar a 60 
+	MOV	A, MINUTOS_CRON
+	CJNE	A, #3Bh, Incrementa_Minutos	;Si los minutos son diferentes de 59 manda llamar a la funcion Incrementa_Minutos
+	ACALL	Reiniciar			;Si los minutos son igual a 59 manda llamar a la funcion Reiniciar
+RET
+
+Reiniciar:
+	MOV	SEGUNDOS_CRON, #0h				
+	MOV 	MINUTOS_CRON, #0h
+	AJMP	REGRESAR_TIMER			;Regresa al timer
+RET
+
+
+
+
+BOTONES_CRON:
+
+	JNB	P3.2, START1		;Si esta presionando el boton 3.3 manda llamar funcion FUNCION_RESTA_MINUTOS
+
+	JNB	P3.3, PAUSE1		;Si esta presionando el boton 3.4 manda llamar funcion FUNCION_AUMENTA_HORAS
+
+	JNB	P3.4, STOP1		;Si esta presionando el boton 3.5 manda llamar funcion FUNCION_RESTA_HORAS
+RET
+
+
+START1:
+	JB	P3.3, START2		;Si no esta presionando el boton 3.2 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+START2:
+	JB	P3.4, START3		;Si no esta presionando el boton 3.4 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+START3:
+	JB	P3.5, START		;Si no esta presionando el boton 3.5 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+START:
+	MOV	CRONOMETRO, #1h
+RET
+
+
+PAUSE1:
+	JB	P3.2, PAUSE2		;Si no esta presionando el boton 3.2 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+PAUSE2:
+	JB	P3.4, PAUSE3		;Si no esta presionando el boton 3.4 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+PAUSE3:
+	JB	P3.5, PAUSE		;Si no esta presionando el boton 3.3 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+PAUSE:
+	MOV	CRONOMETRO, #2h
+RET
+
+
+STOP1:
+	JB	P3.2, STOP2		;Si no esta presionando el boton 3.3 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+STOP2:
+	JB	P3.3, STOP3		;Si no esta presionando el boton 3.2 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+
+STOP3:
+	JB	P3.5, STOP		;Si no esta presionando el boton 3.5 manda llamar la funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+RET
+	
+STOP:
+	MOV 	CRONOMETRO, #3h
+RET
+
+MANDARLCD_CRON:
+ CALL HOME
+ MOV DPTR, #0F100H
+ ;HORAS
+ MOV A, #43H
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ MOV A, #52H
+ MOVX @DPTR, A
+ ACALL DELAY
+
+  ;******DOSPUNTOS
+ MOV A, #7Ch
+ MOVX @DPTR, A
+ ACALL DELAY
+ ;***************
+
+ ;MINUTOS
+ MOV A, UNM
+ MOVX @DPTR, A
+ MOV R7,UNM
+ ACALL DELAY
+
+ MOV A, DEM
+ MOVX @DPTR, A
+ MOV R6,DEM
+ ACALL DELAY
+
+ ;******DOSPUNTOS
+ MOV A, #3Ah
+ MOVX @DPTR, A
+ ACALL DELAY
+ ;***************
+
+ ;SEGUNDOS
+ MOV A, UNS
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ MOV A, DES
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ RET
+;****************************ASCIICONV*********************************
+ASCIICONV_CRON:
+;**************************SEGUNDOS
+ MOV A, SEGUNDOS_CRON
+ CLR C
+ MOV B, #10
+ DIV AB
+ ORL A, TREH
+ MOV UNS, A
+ MOV A, B
+ ORL A, TREH
+ MOV DES, A
+;***************************MINUTOS
+ MOV A, MINUTOS_CRON
+ CLR C
+ MOV B, #10
+ DIV AB
+ ORL A, TREH
+ MOV UNM, A
+ MOV A, B
+ ORL A, TREH
+ MOV DEM, A
+RET
+
+;********************************HOME**********************************
+HOME:
+ MOV DPTR, #0F000H
+ MOV A, #02H ;HOME
+ MOVX @DPTR, A
+ CALL DELAY
+RET
+
+
+INIT_LCD: MOV R7, #3h
+FUN:   	MOV DPTR, #0F000H 
+   	MOV A, #38h	;FUNCTION SET
+   	MOVX @DPTR, A
+   	ACALL DELAY ;IMPLEMENTAR PARA 100Ms
+   	DJNZ R7, FUN
+        
+	MOV A, #0FH	;DISPLAY ON / OFF
+	MOVX @DPTR, A	
+	MOV A, #6H	;ENTRY MODE SET
+	MOVX @DPTR, A
+	MOV A, #14H
+	MOVX @DPTR, A	;CURSOR/DISPLAY SHIFT
+
+	RET
+
+END

@@ -1,0 +1,674 @@
+A51 MACRO ASSEMBLER  MENU                                                                 12/08/2017 13:29:43 PAGE     1
+
+
+MACRO ASSEMBLER A51 V6.20
+OBJECT MODULE PLACED IN Menu.OBJ
+ASSEMBLER INVOKED BY: C:\Keil\C51\BIN\A51.EXE Menu.a52 SET(SMALL) DEBUG EP
+
+LOC  OBJ            LINE     SOURCE
+
+                       1     NAME            MENU
+                       2     ;***DECLARACION DE VARIABLES*******************
+                       3     ;RELOJ
+  0030                 4     SEG     EQU 030H
+  0031                 5     MIN     EQU 031H
+  0032                 6     HOR     EQU 032H
+                       7     
+  0047                 8     UNS     EQU 047H
+  0034                 9     DES     EQU 034H
+  0035                10     UNM     EQU 035H
+  0036                11     DEM     EQU 036H
+  0037                12     UNH     EQU 037H
+  0038                13     DEH     EQU 038H
+                      14     
+                      15     ;OTRAS 
+                      16     
+  0039                17     VAR1    EQU 039H
+  003A                18     VAR2    EQU 03AH
+  003B                19     VAR3    EQU 03BH
+                      20     
+  003C                21     MINI    EQU 03CH
+  003D                22     HORI    EQU 03DH
+                      23     
+  003E                24     CONT1   EQU 03EH
+  003F                25     CONT2   EQU 03FH
+  0040                26     AUX     EQU 040H
+                      27     
+  0041                28     TREH    EQU 041H
+                      29     
+                      30     
+                      31     ;CRONOMETRO
+  0042                32     TIMER           EQU 042H
+  0043                33     SEGUNDOS_CRON   EQU 043H
+  0044                34     MINUTOS_CRON    EQU 044H
+  0045                35     CRONOMETRO      EQU 045H
+  0046                36     MODO            EQU 046H
+                      37     
+                      38     
+                      39     
+                      40     ;--------------------------- VECTOR DE INTERRUPCIONES ----------------------------
+0000                  41             ORG     00H
+0000 013F             42                     AJMP    RESET
+0003                  43             ORG     03H
+0003 0172             44                     AJMP    INTE0
+000B                  45             ORG     0BH
+000B 0173             46                     AJMP    TOV0
+0013                  47             ORG     13H
+0013 017E             48                     AJMP    INTE1
+001B                  49             ORG     1BH
+001B 017F             50                     AJMP    TOV1
+0023                  51             ORG     23H
+0023 0180             52                     AJMP    UART
+002B                  53             ORG     2BH
+002B 0181             54                     AJMP    TOV2
+                      55     ;-------------------------------- RUTINA DE CONFIGURACION ------------------------
+0033                  56             ORG     33H
+0033 758120           57             MOV SP, #20H
+0036 753D03           58             MOV HORI, #03h
+A51 MACRO ASSEMBLER  MENU                                                                 12/08/2017 13:29:43 PAGE     2
+
+0039 753C28           59             MOV MINI, #28h
+003C 754601           60             MOV MODO, #1
+003F                  61     RESET:  
+003F 754130           62             MOV TREH, #30h
+0042 5172             63             ACALL INIT_LCD
+0044 758107           64             MOV     81h,#07h
+0047 758CD8           65             MOV TH0, #0xD8          ;Le asigna a TH0 D8 para el timer
+004A 758ACC           66             MOV TL0, #0xCC          ;Le asigna a TLO CC para el timer       
+004D 758911           67             MOV TMOD, #0x11         ;Le asigna a TMOD 11 para el timer
+0050 D2A9             68             SETB ET0
+0052 D2AF             69             SETB EA
+0054 D28C             70             SETB TR0
+0056 75420E           71             MOV TIMER, #14          ;Inicializa el timer en 14
+0059 754400           72             MOV     MINUTOS_CRON, #0h
+005C 754300           73             MOV     SEGUNDOS_CRON, #0h
+005F 754502           74             MOV     CRONOMETRO, #2
+0062 0164             75             AJMP MAIN
+                      76     
+                      77     ;------------------------------------- MAIN --------------------------------------------
+                      78     
+0064                  79     MAIN:
+0064 1196             80             ACALL   MENU
+0066 11E8             81             ACALL   DELAY
+0068 11E8             82             ACALL   DELAY
+006A 116E             83             ACALL   COMP
+006C 80F6             84     SJMP MAIN
+                      85     
+006E                  86     COMP:
+006E 30B52D           87             JNB     P3.5, INC_MODO
+0071 22               88     RET
+                      89     
+                      90     ;------------------------------ INICIO DE INTERRUPCIONES --------------------------
+0072 32               91     INTE0:  RETI
+0073                  92     TOV0:   
+0073 31AF             93             ACALL MENU_CRONOMETRO
+0075                  94     SEGUNDO:
+0075 D54205           95             DJNZ TIMER, NO          ;Mientras el timer sea diferente de 0 decrementa 1 y manda 
+                             llamar a NO
+0078 31C3             96             ACALL   AUMENTAR        ;Timer llego a 0 y paso un seungo por lo tanto manda llamar
+                              a AUMENTAR donde incrementa un segundo
+007A                  97     REGRESAR_TIMER:                 
+007A 75420E           98             MOV TIMER, #14          ;A timer le vuelve a asignar el 14 para que empiece la cuen
+                             ta otra vez y pase un segundo
+                      99     
+007D 32              100     NO:     RETI
+007E 32              101     INTE1:  RETI
+007F 32              102     TOV1:   RETI
+0080 32              103     UART:   RETI
+0081 32              104     TOV2:   RETI
+                     105     ;-------------------------------------------------------------------------------
+                     106     
+0082                 107     RELOJ:
+0082 316B            108             ACALL COPIARD
+0084 11F5            109             ACALL DATO
+0086 22              110     RET
+                     111     
+0087                 112     OPCION_CRONOMETRO:
+0087 11E8            113             ACALL DELAY
+0089 11E8            114             ACALL DELAY
+008B 11E8            115             ACALL DELAY
+008D 11E8            116             ACALL DELAY
+008F 31E9            117             ACALL BOTONES_CRON
+0091 5146            118             ACALL ASCIICONV_CRON
+0093 5123            119             ACALL MANDARLCD_CRON
+0095 22              120     RET
+                     121     
+A51 MACRO ASSEMBLER  MENU                                                                 12/08/2017 13:29:43 PAGE     3
+
+                     122     
+0096                 123     MENU:
+0096 E546            124             MOV     A, MODO
+0098 B401EC          125             CJNE    A, #1, OPCION_CRONOMETRO
+009B 1182            126             ACALL   RELOJ
+009D 22              127     RET
+                     128     
+009E                 129     INC_MODO:
+009E E546            130             MOV     A, MODO
+00A0 B40203          131             CJNE    A, #2, INC_MODO1
+00A3 7401            132             MOV     A, #1
+00A5 22              133     RET
+00A6                 134     INC_MODO1:
+00A6 0546            135             INC MODO
+00A8 E546            136             MOV A, MODO
+00AA 22              137     RET
+                     138     
+                     139     ;--------------------------------- INICIO DE SUBRUTINAS ---------------------------
+                     140     
+                     141     ;------------------------------------ RELOJ --------------------------------------
+                     142     
+00AB                 143     INIT_CLOCK:
+00AB 909FF8          144             MOV DPTR, #9FF8h ;DIRECCION DE CONTROL DE RELOJ DE LA RAM
+00AE E0              145             MOVX A, @DPTR ;LEER REGISTRO CTRL
+00AF C0E0            146             PUSH ACC
+00B1 4480            147             ORL A, #80h ;ACC.7 = 1 
+00B3 F0              148             MOVX @DPTR, A
+                     149             ;*****************ACTUALIZAR RELOJ***********************
+                     150             ;CONVERTIR VARIABLES A BCD
+00B4 E53D            151             MOV A, HORI
+00B6 F53B            152             MOV VAR3, A;MANDAR A VAR3 EL VALOR A CONVERTIR
+00B8 3189            153             ACALL BCD
+00BA 853A3D          154             MOV HORI,VAR2
+                     155     
+00BD E53C            156             MOV A, MINI
+00BF F53B            157             MOV VAR3, A;MANDAR A VAR3 EL VAOR A CONVERTIR
+00C1 3189            158             ACALL BCD
+00C3 853A3C          159             MOV MINI,VAR2
+                     160     
+                     161             ;*************************
+                     162             ;DAR DATOS DE LA DIRECCION DE LOS SEGUNDOS
+00C6 7400            163             MOV A, #0
+00C8 7582F9          164             MOV DPL, #0F9h
+00CB 75839F          165             MOV DPH, #9Fh  ;Se pone el puntero en la direccion de la RAM
+00CE F0              166             MOVX @DPTR, A
+                     167             ;DAR DATOS DE LA DIRECCION DE LOS MINUTOS
+00CF E53C            168             MOV A, MINI
+00D1 7582FA          169             MOV DPL, #0FAh
+00D4 75839F          170             MOV DPH, #9Fh
+00D7 F0              171             MOVX @DPTR, A
+                     172             ;DAR DATOS DE LA DIRECCION DE LAS HORAS
+00D8 E53D            173             MOV A, HORI
+00DA 7582FB          174             MOV DPL, #0FBh
+00DD 75839F          175             MOV DPH, #9Fh
+00E0 F0              176             MOVX @DPTR, A
+                     177     
+                     178             ;********************************************************
+00E1 909FF8          179             MOV DPTR, #9FF8h        
+00E4 D0E0            180             POP ACC
+00E6 F0              181             MOVX @DPTR, A
+                     182             
+00E7 22              183             RET
+                     184     
+                     185     ;***************************************************
+                     186     
+00E8                 187     DELAY:
+A51 MACRO ASSEMBLER  MENU                                                                 12/08/2017 13:29:43 PAGE     4
+
+00E8 753E05          188             MOV CONT1, #5
+00EB 753FFF          189     RETA1:  MOV     CONT2,#255
+00EE D53FFD          190     RETA2:  DJNZ    CONT2,RETA2
+00F1 D53EF7          191             DJNZ    CONT1,RETA1
+00F4 22              192             RET
+                     193     
+00F5                 194     DATO:
+00F5 3128            195      CALL ASCIICONV_RELOJ ;PRIMERO CONVIERTE
+00F7 11FA            196      CALL MANDARLCD_RELOJ ;LUEGO MUESTRA
+00F9 22              197      RET
+                     198     
+00FA                 199     MANDARLCD_RELOJ:
+00FA 5169            200      CALL HOME
+00FC 90F100          201      MOV DPTR, #0F100H
+                     202     
+                     203      ;HORAS
+00FF E537            204      MOV A, UNH
+0101 F0              205      MOVX @DPTR, A
+0102 11E8            206      ACALL DELAY
+                     207     
+0104 E538            208      MOV A, DEH
+0106 F0              209      MOVX @DPTR, A
+0107 11E8            210      ACALL DELAY
+                     211             
+                     212      ;******DOSPUNTOS
+0109 743A            213      MOV A, #3Ah
+010B F0              214      MOVX @DPTR, A
+010C 11E8            215      ACALL DELAY
+                     216      ;***************
+                     217     
+                     218      ;MINUTOS
+010E E535            219      MOV A, UNM
+0110 F0              220      MOVX @DPTR, A
+0111 11E8            221      ACALL DELAY
+                     222     
+0113 E536            223      MOV A, DEM
+0115 F0              224      MOVX @DPTR, A
+0116 11E8            225      ACALL DELAY
+                     226     
+                     227      ;******DOSPUNTOS
+0118 743A            228      MOV A, #3Ah
+011A F0              229      MOVX @DPTR, A
+011B 11E8            230      ACALL DELAY
+                     231      ;***************
+                     232     
+                     233      ;SEGUNDOS
+011D E547            234      MOV A, UNS
+011F F0              235      MOVX @DPTR, A
+0120 11E8            236      ACALL DELAY
+                     237     
+0122 E534            238      MOV A, DES
+0124 F0              239      MOVX @DPTR, A
+0125 11E8            240      ACALL DELAY
+                     241     
+0127 22              242      RET
+                     243     ;****************************ASCIICONV*********************************
+0128                 244     ASCIICONV_RELOJ:
+                     245      ;**************************SEGUNDOS
+0128 E530            246      MOV A, SEG
+                     247      ;DA A
+012A F5F0            248      MOV B, A
+012C 54F0            249      ANL A, #0F0H
+012E 13              250      RRC A
+012F 13              251      RRC A
+0130 13              252      RRC A
+0131 13              253      RRC A
+A51 MACRO ASSEMBLER  MENU                                                                 12/08/2017 13:29:43 PAGE     5
+
+0132 2430            254      ADD A, #30H ;CONVIERTE A ASCII
+0134 F547            255      MOV UNS, A ;PRIMER DIGITO
+0136 E5F0            256      MOV A,B
+0138 540F            257      ANL A, #0FH
+013A 2430            258      ADD A, #30H
+013C F534            259      MOV DES, A ;SEGUNDO DIGITO
+                     260      ;***************************MINUTOS
+013E E531            261      MOV A, MIN
+                     262      ;DA A
+0140 F5F0            263      MOV B, A
+0142 54F0            264      ANL A, #0F0H
+0144 13              265      RRC A
+0145 13              266      RRC A
+0146 13              267      RRC A
+0147 13              268      RRC A
+0148 2430            269      ADD A, #30H ;CONVIERTE A ASCII
+014A F535            270      MOV UNM, A ;PRIMER DIGITO
+014C E5F0            271      MOV A,B
+014E 540F            272      ANL A, #0FH
+0150 2430            273      ADD A, #30H
+0152 F536            274      MOV DEM, A ;SEGUNDO DIGITO
+                     275      ;*****************************HORAS
+0154 E532            276      MOV A, HOR
+                     277      ;DA A
+0156 F5F0            278      MOV B, A
+0158 54F0            279      ANL A, #0F0H
+015A 13              280      RRC A
+015B 13              281      RRC A
+015C 13              282      RRC A
+015D 13              283      RRC A
+015E 2430            284      ADD A, #30H ;CONVIERTE A ASCII
+0160 F537            285      MOV UNH, A ;PRIMER DIGITO
+0162 E5F0            286      MOV A,B
+0164 540F            287      ANL A, #0FH
+0166 2430            288      ADD A, #30H
+0168 F538            289      MOV DEH, A ;SEGUNDO DIGITO
+                     290      ;**********************************
+016A 22              291      RET
+                     292     
+                     293     ;*******************************COPIARD********************************
+016B                 294     COPIARD:
+                     295             ;Copiar a direcciones de Ram interna los valores del reloj
+016B 7400            296             MOV A, #0
+                     297             ;LEER DATOS DE LA DIRECCION DE LOS SEGUNDOS
+016D 7582F9          298             MOV DPL, #0F9h
+0170 75839F          299             MOV DPH, #9Fh  ;Se pone el puntero en la direccion de la RAM
+0173 E0              300             MOVX A, @DPTR
+0174 F530            301             MOV SEG, A
+                     302             ;LEER DATOS DE LA DIRECCION DE LOS MINUTOS
+0176 7582FA          303             MOV DPL, #0FAh
+0179 75839F          304             MOV DPH, #9Fh
+017C E0              305             MOVX A, @DPTR
+017D F531            306             MOV MIN, A
+                     307             ;LEER DATOS DE LA DIRECCION DE LAS HORAS
+017F 7582FB          308             MOV DPL, #0FBh
+0182 75839F          309             MOV DPH, #9Fh
+0185 E0              310             MOVX A, @DPTR
+0186 F532            311             MOV HOR, A
+0188 22              312     RET
+                     313     ;********************************HEX2BC********************************
+0189                 314     BCD:
+0189 E53B            315              MOV A, VAR3
+018B 753900          316              MOV VAR1, #00h
+018E 753A00          317              MOV VAR2, #00h
+0191 C3              318              CLR C
+0192 75F064          319              MOV B, #100
+A51 MACRO ASSEMBLER  MENU                                                                 12/08/2017 13:29:43 PAGE     6
+
+0195 84              320              DIV AB
+0196 F539            321              MOV VAR1, A
+0198 C3              322              CLR C
+0199 E5F0            323              MOV A, B
+019B 75F00A          324              MOV B, #10
+019E 84              325              DIV AB
+019F C4              326              SWAP A
+01A0 F53A            327              MOV VAR2, A
+01A2 E5F0            328              MOV A, B
+01A4 453A            329              ORL A, VAR2
+01A6 F53A            330              MOV VAR2, A
+01A8 753B00          331              MOV VAR3, #00h
+01AB 853AF0          332              MOV B, VAR2
+                     333              ;MOV R0, VAR2
+01AE 22              334     RET
+                     335     ;**********************************************************************
+                     336     
+                     337     
+                     338     ;------------------------------------ CRONOMETRO ------------------------------------------
+01AF                 339     MENU_CRONOMETRO:
+01AF E545            340             MOV     A, CRONOMETRO
+01B1 B40101          341             CJNE    A, #1, PAUSE_MENU
+01B4 22              342     RET
+01B5                 343     PAUSE_MENU:
+01B5 B40204          344             CJNE    A, #2, STOP_MENU
+01B8 75420E          345             MOV     TIMER, #14
+01BB 22              346     RET
+01BC                 347     STOP_MENU:
+01BC 754400          348             MOV     MINUTOS_CRON, #0H
+01BF 754300          349             MOV     SEGUNDOS_CRON, #0H
+01C2 22              350     RET
+                     351     
+                     352     
+01C3                 353     AUMENTAR:
+01C3 E543            354             MOV     A, SEGUNDOS_CRON
+01C5 B43B03          355             CJNE    A, #3Bh, Incrementa_Segs        ;Si los segundos son diferentes de 59 manda
+                              llamar a la funcion Incrementa_Segs
+01C8 31D5            356             ACALL   MINS                            ;Si los segundos son 59 manda llamar a la f
+                             uncion MINS
+01CA 22              357     RET
+                     358     
+                     359     
+01CB                 360     Incrementa_Segs:
+01CB 0543            361             INC     SEGUNDOS_CRON                                   ;Incrementa un segundo 
+01CD 017A            362             AJMP    REGRESAR_TIMER                  ;Regresa al timer       
+01CF 22              363     RET
+                     364     
+01D0                 365     Incrementa_Minutos:
+01D0 0544            366             INC     MINUTOS_CRON                            ;Incrementa un minuto
+01D2 017A            367             AJMP    REGRESAR_TIMER                  ;Regresa al timer
+01D4 22              368     RET
+                     369     
+01D5                 370     MINS:
+01D5 754300          371             MOV     SEGUNDOS_CRON, #0h                              ;A segundos lo mueve a 0 po
+                             rque no pueden llegar a 60 
+01D8 E544            372             MOV     A, MINUTOS_CRON
+01DA B43BF3          373             CJNE    A, #3Bh, Incrementa_Minutos     ;Si los minutos son diferentes de 59 manda 
+                             llamar a la funcion Incrementa_Minutos
+01DD 31E0            374             ACALL   Reiniciar                       ;Si los minutos son igual a 59 manda llamar
+                              a la funcion Reiniciar
+01DF 22              375     RET
+                     376     
+01E0                 377     Reiniciar:
+01E0 754300          378             MOV     SEGUNDOS_CRON, #0h                              
+01E3 754400          379             MOV     MINUTOS_CRON, #0h
+01E6 017A            380             AJMP    REGRESAR_TIMER                  ;Regresa al timer
+A51 MACRO ASSEMBLER  MENU                                                                 12/08/2017 13:29:43 PAGE     7
+
+01E8 22              381     RET
+                     382     
+                     383     
+                     384     
+                     385     
+01E9                 386     BOTONES_CRON:
+                     387     
+01E9 30B207          388             JNB     P3.2, START1            ;Si esta presionando el boton 3.3 manda llamar func
+                             ion FUNCION_RESTA_MINUTOS
+                     389     
+01EC 30B314          390             JNB     P3.3, PAUSE1            ;Si esta presionando el boton 3.4 manda llamar func
+                             ion FUNCION_AUMENTA_HORAS
+                     391     
+01EF 30B421          392             JNB     P3.4, STOP1             ;Si esta presionando el boton 3.5 manda llamar func
+                             ion FUNCION_RESTA_HORAS
+01F2 22              393     RET
+                     394     
+                     395     
+01F3                 396     START1:
+01F3 20B301          397             JB      P3.3, START2            ;Si no esta presionando el boton 3.2 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+01F6 22              398     RET
+                     399     
+01F7                 400     START2:
+01F7 20B401          401             JB      P3.4, START3            ;Si no esta presionando el boton 3.4 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+01FA 22              402     RET
+                     403     
+01FB                 404     START3:
+01FB 20B501          405             JB      P3.5, START             ;Si no esta presionando el boton 3.5 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+01FE 22              406     RET
+                     407     
+01FF                 408     START:
+01FF 754501          409             MOV     CRONOMETRO, #1h
+0202 22              410     RET
+                     411     
+                     412     
+0203                 413     PAUSE1:
+0203 20B201          414             JB      P3.2, PAUSE2            ;Si no esta presionando el boton 3.2 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+0206 22              415     RET
+                     416     
+0207                 417     PAUSE2:
+0207 20B401          418             JB      P3.4, PAUSE3            ;Si no esta presionando el boton 3.4 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+020A 22              419     RET
+                     420     
+020B                 421     PAUSE3:
+020B 20B501          422             JB      P3.5, PAUSE             ;Si no esta presionando el boton 3.3 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+020E 22              423     RET
+                     424     
+020F                 425     PAUSE:
+020F 754502          426             MOV     CRONOMETRO, #2h
+0212 22              427     RET
+                     428     
+                     429     
+0213                 430     STOP1:
+0213 20B201          431             JB      P3.2, STOP2             ;Si no esta presionando el boton 3.3 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+0216 22              432     RET
+                     433     
+0217                 434     STOP2:
+0217 20B301          435             JB      P3.3, STOP3             ;Si no esta presionando el boton 3.2 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+A51 MACRO ASSEMBLER  MENU                                                                 12/08/2017 13:29:43 PAGE     8
+
+021A 22              436     RET
+                     437     
+021B                 438     STOP3:
+021B 20B501          439             JB      P3.5, STOP              ;Si no esta presionando el boton 3.5 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+021E 22              440     RET
+                     441             
+021F                 442     STOP:
+021F 754503          443             MOV     CRONOMETRO, #3h
+0222 22              444     RET
+                     445     
+0223                 446     MANDARLCD_CRON:
+0223 5169            447      CALL HOME
+0225 90F100          448      MOV DPTR, #0F100H
+                     449     
+                     450      ;MINUTOS
+0228 E535            451      MOV A, UNM
+022A F0              452      MOVX @DPTR, A
+022B AF35            453      MOV R7,UNM
+022D 11E8            454      ACALL DELAY
+                     455     
+022F E536            456      MOV A, DEM
+0231 F0              457      MOVX @DPTR, A
+0232 AE36            458      MOV R6,DEM
+0234 11E8            459      ACALL DELAY
+                     460     
+                     461      ;******DOSPUNTOS
+0236 743A            462      MOV A, #3Ah
+0238 F0              463      MOVX @DPTR, A
+0239 11E8            464      ACALL DELAY
+                     465      ;***************
+                     466     
+                     467      ;SEGUNDOS
+023B E547            468      MOV A, UNS
+023D F0              469      MOVX @DPTR, A
+023E 11E8            470      ACALL DELAY
+                     471     
+0240 E534            472      MOV A, DES
+0242 F0              473      MOVX @DPTR, A
+0243 11E8            474      ACALL DELAY
+                     475     
+0245 22              476      RET
+                     477     ;****************************ASCIICONV*********************************
+0246                 478     ASCIICONV_CRON:
+                     479     ;**************************SEGUNDOS
+0246 E543            480      MOV A, SEGUNDOS_CRON
+0248 C3              481      CLR C
+0249 75F00A          482      MOV B, #10
+024C 84              483      DIV AB
+024D 4541            484      ORL A, TREH
+024F F547            485      MOV UNS, A
+0251 E5F0            486      MOV A, B
+0253 4541            487      ORL A, TREH
+0255 F534            488      MOV DES, A
+                     489     ;***************************MINUTOS
+0257 E544            490      MOV A, MINUTOS_CRON
+0259 C3              491      CLR C
+025A 75F00A          492      MOV B, #10
+025D 84              493      DIV AB
+025E 4541            494      ORL A, TREH
+0260 F535            495      MOV UNM, A
+0262 E5F0            496      MOV A, B
+0264 4541            497      ORL A, TREH
+0266 F536            498      MOV DEM, A
+0268 22              499     RET
+                     500     
+A51 MACRO ASSEMBLER  MENU                                                                 12/08/2017 13:29:43 PAGE     9
+
+                     501     ;********************************HOME**********************************
+0269                 502     HOME:
+0269 90F000          503      MOV DPTR, #0F000H
+026C 7402            504      MOV A, #02H ;HOME
+026E F0              505      MOVX @DPTR, A
+026F 11E8            506      CALL DELAY
+0271 22              507     RET
+                     508     
+                     509     
+0272 7F03            510     INIT_LCD: MOV R7, #3h
+0274 90F000          511     FUN:    MOV DPTR, #0F000H 
+0277 7438            512             MOV A, #38h     ;FUNCTION SET
+0279 F0              513             MOVX @DPTR, A
+027A 11E8            514             ACALL DELAY ;IMPLEMENTAR PARA 100Ms
+027C DFF6            515             DJNZ R7, FUN
+                     516             
+027E 740F            517             MOV A, #0FH     ;DISPLAY ON / OFF
+0280 F0              518             MOVX @DPTR, A   
+0281 7406            519             MOV A, #6H      ;ENTRY MODE SET
+0283 F0              520             MOVX @DPTR, A
+0284 7414            521             MOV A, #14H
+0286 F0              522             MOVX @DPTR, A   ;CURSOR/DISPLAY SHIFT
+                     523     
+0287 22              524             RET
+                     525     
+                     526     END
+A51 MACRO ASSEMBLER  MENU                                                                 12/08/2017 13:29:43 PAGE    10
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E             T Y P E  V A L U E   ATTRIBUTES
+
+ACC. . . . . . . .  D ADDR   00E0H   A   
+ASCIICONV_CRON . .  C ADDR   0246H   A   
+ASCIICONV_RELOJ. .  C ADDR   0128H   A   
+AUMENTAR . . . . .  C ADDR   01C3H   A   
+AUX. . . . . . . .  N NUMB   0040H   A   
+B. . . . . . . . .  D ADDR   00F0H   A   
+BCD. . . . . . . .  C ADDR   0189H   A   
+BOTONES_CRON . . .  C ADDR   01E9H   A   
+COMP . . . . . . .  C ADDR   006EH   A   
+CONT1. . . . . . .  N NUMB   003EH   A   
+CONT2. . . . . . .  N NUMB   003FH   A   
+COPIARD. . . . . .  C ADDR   016BH   A   
+CRONOMETRO . . . .  N NUMB   0045H   A   
+DATO . . . . . . .  C ADDR   00F5H   A   
+DEH. . . . . . . .  N NUMB   0038H   A   
+DELAY. . . . . . .  C ADDR   00E8H   A   
+DEM. . . . . . . .  N NUMB   0036H   A   
+DES. . . . . . . .  N NUMB   0034H   A   
+DPH. . . . . . . .  D ADDR   0083H   A   
+DPL. . . . . . . .  D ADDR   0082H   A   
+EA . . . . . . . .  B ADDR   00A8H.7 A   
+ET0. . . . . . . .  B ADDR   00A8H.1 A   
+FUN. . . . . . . .  C ADDR   0274H   A   
+HOME . . . . . . .  C ADDR   0269H   A   
+HOR. . . . . . . .  N NUMB   0032H   A   
+HORI . . . . . . .  N NUMB   003DH   A   
+INCREMENTA_MINUTOS  C ADDR   01D0H   A   
+INCREMENTA_SEGS. .  C ADDR   01CBH   A   
+INC_MODO . . . . .  C ADDR   009EH   A   
+INC_MODO1. . . . .  C ADDR   00A6H   A   
+INIT_CLOCK . . . .  C ADDR   00ABH   A   
+INIT_LCD . . . . .  C ADDR   0272H   A   
+INTE0. . . . . . .  C ADDR   0072H   A   
+INTE1. . . . . . .  C ADDR   007EH   A   
+MAIN . . . . . . .  C ADDR   0064H   A   
+MANDARLCD_CRON . .  C ADDR   0223H   A   
+MANDARLCD_RELOJ. .  C ADDR   00FAH   A   
+MENU . . . . . . .  C ADDR   0096H   A   
+MENU_CRONOMETRO. .  C ADDR   01AFH   A   
+MIN. . . . . . . .  N NUMB   0031H   A   
+MINI . . . . . . .  N NUMB   003CH   A   
+MINS . . . . . . .  C ADDR   01D5H   A   
+MINUTOS_CRON . . .  N NUMB   0044H   A   
+MODO . . . . . . .  N NUMB   0046H   A   
+NO . . . . . . . .  C ADDR   007DH   A   
+OPCION_CRONOMETRO.  C ADDR   0087H   A   
+P3 . . . . . . . .  D ADDR   00B0H   A   
+PAUSE. . . . . . .  C ADDR   020FH   A   
+PAUSE1 . . . . . .  C ADDR   0203H   A   
+PAUSE2 . . . . . .  C ADDR   0207H   A   
+PAUSE3 . . . . . .  C ADDR   020BH   A   
+PAUSE_MENU . . . .  C ADDR   01B5H   A   
+REGRESAR_TIMER . .  C ADDR   007AH   A   
+REINICIAR. . . . .  C ADDR   01E0H   A   
+RELOJ. . . . . . .  C ADDR   0082H   A   
+RESET. . . . . . .  C ADDR   003FH   A   
+RETA1. . . . . . .  C ADDR   00EBH   A   
+RETA2. . . . . . .  C ADDR   00EEH   A   
+SEG. . . . . . . .  N NUMB   0030H   A   
+SEGUNDO. . . . . .  C ADDR   0075H   A   
+A51 MACRO ASSEMBLER  MENU                                                                 12/08/2017 13:29:43 PAGE    11
+
+SEGUNDOS_CRON. . .  N NUMB   0043H   A   
+SP . . . . . . . .  D ADDR   0081H   A   
+START. . . . . . .  C ADDR   01FFH   A   
+START1 . . . . . .  C ADDR   01F3H   A   
+START2 . . . . . .  C ADDR   01F7H   A   
+START3 . . . . . .  C ADDR   01FBH   A   
+STOP . . . . . . .  C ADDR   021FH   A   
+STOP1. . . . . . .  C ADDR   0213H   A   
+STOP2. . . . . . .  C ADDR   0217H   A   
+STOP3. . . . . . .  C ADDR   021BH   A   
+STOP_MENU. . . . .  C ADDR   01BCH   A   
+TH0. . . . . . . .  D ADDR   008CH   A   
+TIMER. . . . . . .  N NUMB   0042H   A   
+TL0. . . . . . . .  D ADDR   008AH   A   
+TMOD . . . . . . .  D ADDR   0089H   A   
+TOV0 . . . . . . .  C ADDR   0073H   A   
+TOV1 . . . . . . .  C ADDR   007FH   A   
+TOV2 . . . . . . .  C ADDR   0081H   A   
+TR0. . . . . . . .  B ADDR   0088H.4 A   
+TREH . . . . . . .  N NUMB   0041H   A   
+UART . . . . . . .  C ADDR   0080H   A   
+UNH. . . . . . . .  N NUMB   0037H   A   
+UNM. . . . . . . .  N NUMB   0035H   A   
+UNS. . . . . . . .  N NUMB   0047H   A   
+VAR1 . . . . . . .  N NUMB   0039H   A   
+VAR2 . . . . . . .  N NUMB   003AH   A   
+VAR3 . . . . . . .  N NUMB   003BH   A   
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)

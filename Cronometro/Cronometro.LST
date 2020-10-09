@@ -1,0 +1,675 @@
+A51 MACRO ASSEMBLER  CRONOMETRO                                                           12/07/2017 12:20:24 PAGE     1
+
+
+MACRO ASSEMBLER A51 V6.20
+OBJECT MODULE PLACED IN Cronometro.OBJ
+ASSEMBLER INVOKED BY: C:\Keil\C51\BIN\A51.EXE Cronometro.a52 SET(SMALL) DEBUG EP
+
+LOC  OBJ            LINE     SOURCE
+
+                       1     NAME    PROYECTO
+                       2     ;--------------------------------- VARIABLES -------------------------------------
+                       3     
+  0020                 4     TIMER                   EQU     20H
+  0034                 5     CONTADOR                EQU     34H
+  0035                 6     CRONOMETRO              EQU     35H
+  0036                 7     MINUTOS_CRON            EQU     36H
+  0037                 8     SEGUNDOS_CRON           EQU     37H
+                       9     
+                      10     
+                      11     
+                      12     ;--------------------------- VECTOR DE INTERRUPCIONES ----------------------------
+0000                  13             ORG     00H
+0000 0133             14                     AJMP    RESET
+0003                  15             ORG     03H
+0003 015D             16                     AJMP    INTE0
+000B                  17             ORG     0BH
+000B 015E             18                     AJMP    TOV0
+0013                  19             ORG     13H
+0013 0169             20                     AJMP    INTE1
+001B                  21             ORG     1BH
+001B 016A             22                     AJMP    TOV1
+0023                  23             ORG     23H
+0023 016B             24                     AJMP    UART
+002B                  25             ORG     2BH
+002B 016C             26                     AJMP    TOV2
+                      27     ;-------------------------------- RUTINA DE CONFIGURACION ------------------------
+0033                  28             ORG     33H
+0033 758107           29     RESET:  MOV     81h,#07h
+0036 758CD8           30             MOV TH0, #0xD8          ;Le asigna a TH0 D8 para el timer
+0039 758ACC           31             MOV TL0, #0xCC          ;Le asigna a TLO CC para el timer       
+003C 758911           32             MOV TMOD, #0x11         ;Le asigna a TMOD 11 para el timer
+003F D2A9             33             SETB ET0
+0041 D2AF             34             SETB EA
+0043 D28C             35             SETB TR0
+0045 75200E           36             MOV TIMER, #14          ;Inicializa el timer en 14
+0048 753600           37             MOV     MINUTOS_CRON, #0H
+004B 753700           38             MOV     SEGUNDOS_CRON, #0H
+004E 753502           39             MOV     CRONOMETRO, #2
+0051 0153             40             AJMP MAIN
+                      41     ;-------------------------------- PROGRAMA PRINCIPAL -----------------------------
+0053                  42     MAIN:
+0053 11BC             43             ACALL   SACAR_VALOR_DISPLAY_HORAS      
+0055 11C6             44             ACALL   SACAR_VALOR_DISPLAY_MINUTOS     
+0057 1185             45             ACALL   RETARDO
+0059 5142             46             ACALL   BOTONES
+005B 0153             47             AJMP    MAIN
+                      48     
+                      49             
+                      50     ;------------------------------ INICIO DE INTERRUPCIONES --------------------------
+005D 32               51     INTE0:  RETI
+005E                  52     TOV0:   
+005E 116D             53             ACALL MENU_CRONOMETRO
+0060                  54     SEGUNDO:
+0060 D52005           55             DJNZ TIMER, NO          ;Mientras el timer sea diferente de 0 decrementa 1 y manda 
+                             llamar a NO
+0063 511C             56             ACALL   AUMENTAR        ;Timer llego a 0 y paso un seungo por lo tanto manda llamar
+                              a AUMENTAR donde incrementa un segundo
+A51 MACRO ASSEMBLER  CRONOMETRO                                                           12/07/2017 12:20:24 PAGE     2
+
+0065                  57     REGRESAR_TIMER:                 
+0065 75200E           58             MOV TIMER, #14          ;A timer le vuelve a asignar el 14 para que empiece la cuen
+                             ta otra vez y pase un segundo
+                      59     
+0068 32               60     NO:     RETI
+0069 32               61     INTE1:  RETI
+006A 32               62     TOV1:   RETI
+006B 32               63     UART:   RETI
+006C 32               64     TOV2:   RETI
+                      65     
+                      66     
+                      67     ;--------------------------------- INICIO DE SUBRUTINAS ---------------------------
+                      68     
+006D                  69     MENU_CRONOMETRO:
+006D E535             70             MOV     A, CRONOMETRO
+006F B40101           71             CJNE    A, #1, PAUSE_MENU
+0072 22               72     RET
+0073                  73     PAUSE_MENU:
+0073 B40204           74             CJNE    A, #2, STOP_MENU
+0076 75200E           75             MOV     TIMER, #14
+0079 22               76     RET
+007A                  77     STOP_MENU:
+007A 7800             78             MOV     R0, #0
+007C 753600           79             MOV     MINUTOS_CRON, #0H
+007F 7B00             80             MOV     R3, #0
+0081 753700           81             MOV     SEGUNDOS_CRON, #0H
+0084 22               82     RET
+                      83     
+                      84     
+0085                  85     RETARDO:        
+0085 7EC8             86            MOV R6,#200              ;A R6 le asigna 200     
+0087 753414           87     RETA1: MOV CONTADOR,#20         ;A CONTADOR le asigna 20
+008A                  88     RETA2:   
+008A 75A0FE           89         MOV P2, #0xFE             ;Prende el primer display 
+008D 11D0             90         ACALL COMPARAR1           ;Llama la funcion COMPARAR1 donde compara el cociente de las 
+                             horas (el primer numero)
+008F 7580FF           91         MOV P0, #0xFF             ;Limpia P0 (para que se muestren bien los numeros)
+0092 75A0FF           92         MOV P2, #0xFF             ;Apaga el display
+                      93     
+0095 75A0FD           94         MOV P2, #0xFD             ;Prende el segundo display            
+0098 310A             95         ACALL COMPARAR2           ;Llama la funcion COMPARAR2 donde compara el residuo de las h
+                             oras (el segundo numero)     
+009A 7580FF           96         MOV P0, #0xFF             ;Limpia P0 (para que se muestren bien los numeros)
+009D 75A0FF           97         MOV P2, #0xFF             ;Apaga el display
+                      98     
+00A0 75A0FB           99         MOV P2, #0xFB             ;Prende el tercer display     
+00A3 3144            100         ACALL COMPARAR3           ;Llama la funcion COMPARAR3 donde compara el cociente de los 
+                             minutos (el tercer numero)   
+00A5 7580FF          101         MOV P0, #0xFF             ;Limpia P0 (para que se muestren bien los numeros)
+00A8 75A0FF          102         MOV P2, #0xFF             ;Apaga el display
+                     103     
+00AB 75A0F7          104         MOV P2, #0xF7             ;Prende el cuarto display     
+00AE 317E            105         ACALL COMPARAR4           ;Llama la funcion COMPARAR4 donde compara el residuo de los m
+                             inutos (el cuarto numero)    
+00B0 7580FF          106         MOV P0, #0xFF             ;Limpia P0 (para que se muestren bien los numeros)
+00B3 75A0FF          107         MOV P2, #0xFF             ;Apaga el display
+                     108             
+00B6 D534D1          109         DJNZ CONTADOR,RETA2               ;Decrementa CONTADOR mientras sea diferente de cero y
+                              mientras sea diferente de 0 manda llamar la funcion RETA2
+00B9 DECC            110         DJNZ R6,RETA1                     ;Decrementa R6 mientras sea diferente de cero y mient
+                             ras sea diferente de 0 manda llamar la funcion RETA1
+                     111     
+00BB 22              112     RET     
+                     113     
+00BC                 114     SACAR_VALOR_DISPLAY_HORAS:
+00BC E536            115             MOV A, MINUTOS_CRON     ;a A le asigna lo que tiene horas
+A51 MACRO ASSEMBLER  CRONOMETRO                                                           12/07/2017 12:20:24 PAGE     3
+
+00BE 75F00A          116             MOV B, #10      ;a B le asgina un valor de 10   
+00C1 84              117             DIV AB          ;Divide horas entre 10, A obtiene el cociente y B el residuo
+00C2 AAF0            118             MOV R2, B       ;a R2 le asigna el residuo
+00C4 F9              119             MOV R1, A       ;a R1 le asgina el cociente             
+00C5 22              120     RET                     
+00C6                 121     SACAR_VALOR_DISPLAY_MINUTOS:
+00C6 E537            122             MOV A, SEGUNDOS_CRON    ;a A le asigna lo que tiene horas
+00C8 75F00A          123             MOV B, #10      ;a B le asgina un valor de 10   
+00CB 84              124             DIV AB          ;Divide horas entre 10, A obtiene el cociente y B el residuo
+00CC ADF0            125             MOV R5, B       ;a R5 le asigna el residuo
+00CE FC              126             MOV R4, A       ;a R4 le asgina el cociente             
+00CF 22              127     RET                     
+00D0                 128     COMPARAR1:                      
+00D0                 129     C10:                            
+00D0 B90003          130             CJNE    R1, #0, C11     ;Si el cociente de las horas no es cero manda llamar la sig
+                             uiente funcion donde pregunta por 1
+00D3 31B8            131             ACALL CERO              ;Si el cociente es 0 manda llamar la funcion 0 donde asigna
+                              a P0 el valor para 0                
+00D5 22              132             RET             
+                     133                             
+00D6                 134     C11:
+00D6 B90103          135             CJNE    R1, #1, C12     ;Si el cociente de las horas no es 1 manda llamar la siguie
+                             nte funcion donde pregunta por 2
+00D9 31BD            136             ACALL UNO               ;Si el cociente es 1 manda llamar la funcion 1 donde asigna
+                              a P0 el valor para 1
+00DB 22              137             RET
+00DC                 138     C12:
+00DC B90203          139             CJNE    R1, #2, C13     ;Si el cociente de las horas no es 2 manda llamar la siguie
+                             nte funcion donde pregunta por 3
+00DF 31C2            140             ACALL DOS               ;Si el cociente es 2 manda llamar la funcion 2 donde asigna
+                              a P0 el valor para 2                
+00E1 22              141             RET
+00E2                 142     C13:
+00E2 B90303          143             CJNE    R1, #3, C14     ;Si el cociente de las horas no es 3 manda llamar la siguie
+                             nte funcion donde pregunta por 4
+00E5 31C7            144             ACALL TRES              ;Si el cociente es 3 manda llamar la funcion 3 donde asigna
+                              a P0 el valor para 3                
+00E7 22              145             RET
+00E8                 146     C14:
+00E8 B90403          147             CJNE    R1, #4, C15     ;Si el cociente de las horas no es 4 manda llamar la siguie
+                             nte funcion donde pregunta por 5
+00EB 31CC            148             ACALL CUATRO            ;Si el cociente es 4 manda llamar la funcion 4 donde asigna
+                              a P0 el valor para 4                
+00ED 22              149             RET
+00EE                 150     C15:
+00EE B90503          151             CJNE    R1, #5, C16     ;Si el cociente de las horas no es 5 manda llamar la siguie
+                             nte funcion donde pregunta por 6
+00F1 31D1            152             ACALL CINCO             ;Si el cociente es 5 manda llamar la funcion 5 donde asigna
+                              a P0 el valor para 5                
+00F3 22              153             RET
+00F4                 154     C16:
+00F4 B90603          155             CJNE    R1, #6, C17     ;Si el cociente de las horas no es 6 manda llamar la siguie
+                             nte funcion donde pregunta por 7
+00F7 31D6            156             ACALL SEIS              ;Si el cociente es 6 manda llamar la funcion 6 donde asigna
+                              a P0 el valor para 6                
+00F9 22              157             RET
+00FA                 158     C17:
+00FA B90703          159             CJNE    R1, #7, C18     ;Si el cociente de las horas no es 7 manda llamar la siguie
+                             nte funcion donde pregunta por 8
+00FD 31DB            160             ACALL SIETE             ;Si el cociente es 7 manda llamar la funcion 7 donde asigna
+                              a P0 el valor para 7                
+00FF 22              161             RET
+0100                 162     C18:
+0100 B90803          163             CJNE    R1, #8, C19     ;Si el cociente de las horas no es 8 manda llamar la siguie
+                             nte funcion donde manda llamar el 9 en el display
+0103 31E0            164             ACALL OCHO              ;Si el cociente es 8 manda llamar la funcion 8 donde asigna
+A51 MACRO ASSEMBLER  CRONOMETRO                                                           12/07/2017 12:20:24 PAGE     4
+
+                              a P0 el valor para 8                
+0105 22              165             RET
+0106                 166     C19:
+0106 31E5            167             ACALL NUEVE             ;Manda llamar la funcion 9 donde asigna a P0 el valor para 
+                             9            
+0108 22              168             RET
+0109 22              169     RET
+010A                 170     COMPARAR2:
+010A                 171     C20:
+010A BA0003          172             CJNE    R2, #0, C21
+010D 31EA            173             ACALL CERO1             ;Si el cociente es 0 manda llamar la funcion CERO1 donde as
+                             igna a P0 el valor para 0.
+010F 22              174             RET
+0110                 175     C21:
+0110 BA0103          176             CJNE    R2, #1, C22
+0113 31EF            177             ACALL UNO1
+0115 22              178             RET
+0116                 179     C22:
+0116 BA0203          180             CJNE    R2, #2, C23
+0119 31F4            181             ACALL DOS1
+011B 22              182             RET
+011C                 183     C23:
+011C BA0303          184             CJNE    R2, #3, C24
+011F 31F9            185             ACALL TRES1
+0121 22              186             RET
+0122                 187     C24:
+0122 BA0403          188             CJNE    R2, #4, C25
+0125 31FE            189             ACALL CUATRO1
+0127 22              190             RET
+0128                 191     C25:
+0128 BA0503          192             CJNE    R2, #5, C26
+012B 5103            193             ACALL CINCO1
+012D 22              194             RET
+012E                 195     C26:
+012E BA0603          196             CJNE    R2, #6, C27
+0131 5108            197             ACALL SEIS1
+0133 22              198             RET
+0134                 199     C27:
+0134 BA0703          200             CJNE    R2, #7, C28
+0137 510D            201             ACALL SIETE1
+0139 22              202             RET
+013A                 203     C28:
+013A BA0803          204             CJNE    R2, #8, C29
+013D 5112            205             ACALL OCHO1
+013F 22              206             RET
+0140                 207     C29:
+0140 5117            208             ACALL NUEVE1
+0142 22              209             RET
+0143 22              210     RET
+0144                 211     COMPARAR3:
+0144                 212     C30:
+0144 BC0003          213             CJNE    R4, #0, C31
+0147 31B8            214             ACALL CERO
+0149 22              215             RET
+014A                 216     C31:
+014A BC0103          217             CJNE    R4, #1, C32
+014D 31BD            218             ACALL UNO
+014F 22              219             RET
+0150                 220     C32:
+0150 BC0203          221             CJNE    R4, #2, C33
+0153 31C2            222             ACALL DOS
+0155 22              223             RET
+0156                 224     C33:
+0156 BC0303          225             CJNE    R4, #3, C34
+0159 31C7            226             ACALL TRES
+015B 22              227             RET
+A51 MACRO ASSEMBLER  CRONOMETRO                                                           12/07/2017 12:20:24 PAGE     5
+
+015C                 228     C34:
+015C BC0403          229             CJNE    R4, #4, C35
+015F 31CC            230             ACALL CUATRO
+0161 22              231             RET
+0162                 232     C35:
+0162 BC0503          233             CJNE    R4, #5, C36
+0165 31D1            234             ACALL CINCO
+0167 22              235             RET
+0168                 236     C36:
+0168 BC0603          237             CJNE    R4, #6, C37
+016B 31D6            238             ACALL SEIS
+016D 22              239             RET
+016E                 240     C37:
+016E BC0703          241             CJNE    R4, #7, C38
+0171 31DB            242             ACALL SIETE
+0173 22              243             RET
+0174                 244     C38:
+0174 BC0803          245             CJNE    R4, #8, C39
+0177 31E0            246             ACALL OCHO
+0179 22              247             RET
+017A                 248     C39:
+017A 31E5            249             ACALL NUEVE
+017C 22              250             RET
+017D 22              251     RET
+017E                 252     COMPARAR4:
+017E                 253     C40:
+017E BD0003          254             CJNE    R5, #0, C41
+0181 31B8            255             ACALL CERO
+0183 22              256             RET
+0184                 257     C41:
+0184 BD0103          258             CJNE    R5, #1, C42
+0187 31BD            259             ACALL UNO
+0189 22              260             RET
+018A                 261     C42:
+018A BD0203          262             CJNE    R5, #2, C43
+018D 31C2            263             ACALL DOS
+018F 22              264             RET
+0190                 265     C43:
+0190 BD0303          266             CJNE    R5, #3, C44
+0193 31C7            267             ACALL TRES
+0195 22              268             RET
+0196                 269     C44:
+0196 BD0403          270             CJNE    R5, #4, C45
+0199 31CC            271             ACALL CUATRO
+019B 22              272             RET
+019C                 273     C45:
+019C BD0503          274             CJNE    R5, #5, C46
+019F 31D1            275             ACALL CINCO
+01A1 22              276             RET
+01A2                 277     C46:
+01A2 BD0603          278             CJNE    R5, #6, C47
+01A5 31D6            279             ACALL SEIS
+01A7 22              280             RET
+01A8                 281     C47:
+01A8 BD0703          282             CJNE    R5, #7, C48
+01AB 31DB            283             ACALL SIETE
+01AD 22              284             RET
+01AE                 285     C48:
+01AE BD0803          286             CJNE    R5, #8, C49
+01B1 31E0            287             ACALL OCHO
+01B3 22              288             RET
+01B4                 289     C49:
+01B4 31E5            290             ACALL NUEVE
+01B6 22              291             RET
+01B7 22              292     RET
+                     293     
+A51 MACRO ASSEMBLER  CRONOMETRO                                                           12/07/2017 12:20:24 PAGE     6
+
+01B8                 294     CERO:                   
+01B8 74C0            295             MOV A, #0xC0    ;Mueve a A el valor para 0 en el display
+01BA F580            296             MOV P0, A       ;Mueve a P0 lo que tiene A
+01BC 22              297             RET                     
+01BD                 298     UNO:
+01BD 74F9            299             MOV A, #0xF9    ;Mueve a A el valor para 1 en el display
+01BF F580            300             MOV P0, A       ;Mueve a P0 lo que tiene A
+01C1 22              301             RET
+01C2                 302     DOS: 
+01C2 74A4            303             MOV A, #0xA4    ;Mueve a A el valor para 2 en el display
+01C4 F580            304             MOV P0, A       ;Mueve a P0 lo que tiene A
+01C6 22              305             RET
+01C7                 306     TRES: 
+01C7 74B0            307             MOV A, #0xB0    ;Mueve a A el valor para 3 en el display
+01C9 F580            308             MOV P0, A       ;Mueve a P0 lo que tiene A
+01CB 22              309             RET
+01CC                 310     CUATRO: 
+01CC 7499            311             MOV A, #0x99    ;Mueve a A el valor para 4 en el display
+01CE F580            312             MOV P0, A       ;Mueve a P0 lo que tiene A
+01D0 22              313             RET
+01D1                 314     CINCO: 
+01D1 7492            315             MOV A, #0x92    ;Mueve a A el valor para 5 en el display
+01D3 F580            316             MOV P0, A       ;Mueve a P0 lo que tiene A
+01D5 22              317             RET
+01D6                 318     SEIS: 
+01D6 7482            319             MOV A, #0x82    ;Mueve a A el valor para 6 en el display
+01D8 F580            320             MOV P0, A       ;Mueve a P0 lo que tiene A
+01DA 22              321             RET
+01DB                 322     SIETE: 
+01DB 74F8            323             MOV A, #0xF8    ;Mueve a A el valor para 7 en el display
+01DD F580            324             MOV P0, A       ;Mueve a P0 lo que tiene A
+01DF 22              325             RET
+01E0                 326     OCHO: 
+01E0 7480            327             MOV A, #0x80    ;Mueve a A el valor para 8 en el display
+01E2 F580            328             MOV P0, A       ;Mueve a P0 lo que tiene A
+01E4 22              329             RET
+01E5                 330     NUEVE: 
+01E5 7498            331             MOV A, #0x98    ;Mueve a A el valor para 9 en el display
+01E7 F580            332             MOV P0, A       ;Mueve a P0 lo que tiene A
+01E9 22              333             RET
+                     334     
+                     335     
+01EA                 336     CERO1:
+01EA 7440            337             MOV A, #0x40    ;Mueve a A el valor para 0. en el display
+01EC F580            338             MOV P0, A       ;Mueve a P0 lo que tiene A
+01EE 22              339             RET
+01EF                 340     UNO1:
+01EF 7479            341             MOV A, #0x79    ;Mueve a A el valor para 1. en el display
+01F1 F580            342             MOV P0, A       ;Mueve a P0 lo que tiene A
+01F3 22              343             RET
+01F4                 344     DOS1: 
+01F4 7424            345             MOV A, #0x24    ;Mueve a A el valor para 2. en el display
+01F6 F580            346             MOV P0, A       ;Mueve a P0 lo que tiene A
+01F8 22              347             RET
+01F9                 348     TRES1: 
+01F9 7430            349             MOV A, #0x30    ;Mueve a A el valor para 3. en el display
+01FB F580            350             MOV P0, A       ;Mueve a P0 lo que tiene A
+01FD 22              351             RET
+01FE                 352     CUATRO1: 
+01FE 7419            353             MOV A, #0x19    ;Mueve a A el valor para 4. en el display
+0200 F580            354             MOV P0, A       ;Mueve a P0 lo que tiene A
+0202 22              355             RET
+0203                 356     CINCO1: 
+0203 7412            357             MOV A, #0x12    ;Mueve a A el valor para 5. en el display
+0205 F580            358             MOV P0, A       ;Mueve a P0 lo que tiene A
+0207 22              359             RET
+A51 MACRO ASSEMBLER  CRONOMETRO                                                           12/07/2017 12:20:24 PAGE     7
+
+0208                 360     SEIS1: 
+0208 7402            361             MOV A, #0x02    ;Mueve a A el valor para 6. en el display
+020A F580            362             MOV P0, A       ;Mueve a P0 lo que tiene A
+020C 22              363             RET
+020D                 364     SIETE1: 
+020D 7478            365             MOV A, #0x78    ;Mueve a A el valor para 7. en el display
+020F F580            366             MOV P0, A       ;Mueve a P0 lo que tiene A
+0211 22              367             RET
+0212                 368     OCHO1: 
+0212 7400            369             MOV A, #0x00    ;Mueve a A el valor para 8. en el display
+0214 F580            370             MOV P0, A       ;Mueve a P0 lo que tiene A
+0216 22              371             RET
+0217                 372     NUEVE1: 
+0217 7418            373             MOV A, #0x18    ;Mueve a A el valor para 9. en el display
+0219 F580            374             MOV P0, A       ;Mueve a P0 lo que tiene A
+021B 22              375             RET
+                     376     
+                     377     
+                     378     
+021C                 379     AUMENTAR:
+021C E537            380             MOV     A, SEGUNDOS_CRON
+021E B43B03          381             CJNE    A, #59, Incrementa_Segs ;Si los segundos son diferentes de 59 manda llamar 
+                             a la funcion Incrementa_Segs
+0221 512E            382             ACALL   MINS                            ;Si los segundos son 59 manda llamar a la f
+                             uncion MINS
+0223 22              383     RET
+                     384     
+                     385     
+0224                 386     Incrementa_Segs:
+0224 0537            387             INC     SEGUNDOS_CRON                                   ;Incrementa un segundo 
+0226 0165            388             AJMP    REGRESAR_TIMER                  ;Regresa al timer       
+0228 22              389     RET
+                     390     
+0229                 391     Incrementa_Minutos:
+0229 0536            392             INC     MINUTOS_CRON                            ;Incrementa un minuto
+022B 0165            393             AJMP    REGRESAR_TIMER                  ;Regresa al timer
+022D 22              394     RET
+                     395     
+022E                 396     MINS:
+022E 753700          397             MOV     SEGUNDOS_CRON, #0                               ;A segundos lo mueve a 0 po
+                             rque no pueden llegar a 60 
+0231 E536            398             MOV     A, MINUTOS_CRON
+0233 B43BF3          399             CJNE    A, #59, Incrementa_Minutos      ;Si los minutos son diferentes de 59 manda 
+                             llamar a la funcion Incrementa_Minutos
+0236 5139            400             ACALL   Reiniciar                       ;Si los minutos son igual a 59 manda llamar
+                              a la funcion Reiniciar
+0238 22              401     RET
+                     402     
+0239                 403     Reiniciar:
+0239 753700          404             MOV     SEGUNDOS_CRON, #0                               
+023C 753600          405             MOV     MINUTOS_CRON, #0
+023F 0165            406             AJMP    REGRESAR_TIMER                  ;Regresa al timer
+0241 22              407     RET
+                     408     
+                     409     
+                     410     
+                     411     
+0242                 412     BOTONES:
+                     413     
+0242 30B207          414             JNB     P3.2, START1            ;Si esta presionando el boton 3.3 manda llamar func
+                             ion FUNCION_RESTA_MINUTOS
+                     415     
+0245 30B314          416             JNB     P3.3, PAUSE1            ;Si esta presionando el boton 3.4 manda llamar func
+                             ion FUNCION_AUMENTA_HORAS
+                     417     
+0248 30B421          418             JNB     P3.4, STOP1             ;Si esta presionando el boton 3.5 manda llamar func
+A51 MACRO ASSEMBLER  CRONOMETRO                                                           12/07/2017 12:20:24 PAGE     8
+
+                             ion FUNCION_RESTA_HORAS
+024B 22              419     RET
+                     420     
+                     421     
+024C                 422     START1:
+024C 20B301          423             JB      P3.3, START2            ;Si no esta presionando el boton 3.2 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+024F 22              424     RET
+                     425     
+0250                 426     START2:
+0250 20B401          427             JB      P3.4, START3            ;Si no esta presionando el boton 3.4 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+0253 22              428     RET
+                     429     
+0254                 430     START3:
+0254 20B501          431             JB      P3.5, START             ;Si no esta presionando el boton 3.5 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+0257 22              432     RET
+                     433     
+0258                 434     START:
+0258 753501          435             MOV     CRONOMETRO, #1
+025B 22              436     RET
+                     437     
+                     438     
+025C                 439     PAUSE1:
+025C 20B201          440             JB      P3.2, PAUSE2            ;Si no esta presionando el boton 3.2 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+025F 22              441     RET
+                     442     
+0260                 443     PAUSE2:
+0260 20B401          444             JB      P3.4, PAUSE3            ;Si no esta presionando el boton 3.4 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+0263 22              445     RET
+                     446     
+0264                 447     PAUSE3:
+0264 20B501          448             JB      P3.5, PAUSE             ;Si no esta presionando el boton 3.3 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+0267 22              449     RET
+                     450     
+0268                 451     PAUSE:
+0268 753502          452             MOV     CRONOMETRO, #2
+026B 22              453     RET
+                     454     
+                     455     
+026C                 456     STOP1:
+026C 20B201          457             JB      P3.2, STOP2             ;Si no esta presionando el boton 3.3 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+026F 22              458     RET
+                     459     
+0270                 460     STOP2:
+0270 20B301          461             JB      P3.3, STOP3             ;Si no esta presionando el boton 3.2 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+0273 22              462     RET
+                     463     
+0274                 464     STOP3:
+0274 20B501          465             JB      P3.5, STOP              ;Si no esta presionando el boton 3.5 manda llamar l
+                             a funcion, si no, no hace nada y regresa a BOTONES en la siguiente linea de donde se quedo
+0277 22              466     RET
+                     467             
+0278                 468     STOP:
+0278 753503          469             MOV     CRONOMETRO, #3
+027B 22              470     RET
+                     471     
+                     472     
+                     473     END
+A51 MACRO ASSEMBLER  CRONOMETRO                                                           12/07/2017 12:20:24 PAGE     9
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E                      T Y P E  V A L U E   ATTRIBUTES
+
+AUMENTAR. . . . . . . . . .  C ADDR   021CH   A   
+B . . . . . . . . . . . . .  D ADDR   00F0H   A   
+BOTONES . . . . . . . . . .  C ADDR   0242H   A   
+C10 . . . . . . . . . . . .  C ADDR   00D0H   A   
+C11 . . . . . . . . . . . .  C ADDR   00D6H   A   
+C12 . . . . . . . . . . . .  C ADDR   00DCH   A   
+C13 . . . . . . . . . . . .  C ADDR   00E2H   A   
+C14 . . . . . . . . . . . .  C ADDR   00E8H   A   
+C15 . . . . . . . . . . . .  C ADDR   00EEH   A   
+C16 . . . . . . . . . . . .  C ADDR   00F4H   A   
+C17 . . . . . . . . . . . .  C ADDR   00FAH   A   
+C18 . . . . . . . . . . . .  C ADDR   0100H   A   
+C19 . . . . . . . . . . . .  C ADDR   0106H   A   
+C20 . . . . . . . . . . . .  C ADDR   010AH   A   
+C21 . . . . . . . . . . . .  C ADDR   0110H   A   
+C22 . . . . . . . . . . . .  C ADDR   0116H   A   
+C23 . . . . . . . . . . . .  C ADDR   011CH   A   
+C24 . . . . . . . . . . . .  C ADDR   0122H   A   
+C25 . . . . . . . . . . . .  C ADDR   0128H   A   
+C26 . . . . . . . . . . . .  C ADDR   012EH   A   
+C27 . . . . . . . . . . . .  C ADDR   0134H   A   
+C28 . . . . . . . . . . . .  C ADDR   013AH   A   
+C29 . . . . . . . . . . . .  C ADDR   0140H   A   
+C30 . . . . . . . . . . . .  C ADDR   0144H   A   
+C31 . . . . . . . . . . . .  C ADDR   014AH   A   
+C32 . . . . . . . . . . . .  C ADDR   0150H   A   
+C33 . . . . . . . . . . . .  C ADDR   0156H   A   
+C34 . . . . . . . . . . . .  C ADDR   015CH   A   
+C35 . . . . . . . . . . . .  C ADDR   0162H   A   
+C36 . . . . . . . . . . . .  C ADDR   0168H   A   
+C37 . . . . . . . . . . . .  C ADDR   016EH   A   
+C38 . . . . . . . . . . . .  C ADDR   0174H   A   
+C39 . . . . . . . . . . . .  C ADDR   017AH   A   
+C40 . . . . . . . . . . . .  C ADDR   017EH   A   
+C41 . . . . . . . . . . . .  C ADDR   0184H   A   
+C42 . . . . . . . . . . . .  C ADDR   018AH   A   
+C43 . . . . . . . . . . . .  C ADDR   0190H   A   
+C44 . . . . . . . . . . . .  C ADDR   0196H   A   
+C45 . . . . . . . . . . . .  C ADDR   019CH   A   
+C46 . . . . . . . . . . . .  C ADDR   01A2H   A   
+C47 . . . . . . . . . . . .  C ADDR   01A8H   A   
+C48 . . . . . . . . . . . .  C ADDR   01AEH   A   
+C49 . . . . . . . . . . . .  C ADDR   01B4H   A   
+CERO. . . . . . . . . . . .  C ADDR   01B8H   A   
+CERO1 . . . . . . . . . . .  C ADDR   01EAH   A   
+CINCO . . . . . . . . . . .  C ADDR   01D1H   A   
+CINCO1. . . . . . . . . . .  C ADDR   0203H   A   
+COMPARAR1 . . . . . . . . .  C ADDR   00D0H   A   
+COMPARAR2 . . . . . . . . .  C ADDR   010AH   A   
+COMPARAR3 . . . . . . . . .  C ADDR   0144H   A   
+COMPARAR4 . . . . . . . . .  C ADDR   017EH   A   
+CONTADOR. . . . . . . . . .  N NUMB   0034H   A   
+CRONOMETRO. . . . . . . . .  N NUMB   0035H   A   
+CUATRO. . . . . . . . . . .  C ADDR   01CCH   A   
+CUATRO1 . . . . . . . . . .  C ADDR   01FEH   A   
+DOS . . . . . . . . . . . .  C ADDR   01C2H   A   
+DOS1. . . . . . . . . . . .  C ADDR   01F4H   A   
+EA. . . . . . . . . . . . .  B ADDR   00A8H.7 A   
+ET0 . . . . . . . . . . . .  B ADDR   00A8H.1 A   
+INCREMENTA_MINUTOS. . . . .  C ADDR   0229H   A   
+A51 MACRO ASSEMBLER  CRONOMETRO                                                           12/07/2017 12:20:24 PAGE    10
+
+INCREMENTA_SEGS . . . . . .  C ADDR   0224H   A   
+INTE0 . . . . . . . . . . .  C ADDR   005DH   A   
+INTE1 . . . . . . . . . . .  C ADDR   0069H   A   
+MAIN. . . . . . . . . . . .  C ADDR   0053H   A   
+MENU_CRONOMETRO . . . . . .  C ADDR   006DH   A   
+MINS. . . . . . . . . . . .  C ADDR   022EH   A   
+MINUTOS_CRON. . . . . . . .  N NUMB   0036H   A   
+NO. . . . . . . . . . . . .  C ADDR   0068H   A   
+NUEVE . . . . . . . . . . .  C ADDR   01E5H   A   
+NUEVE1. . . . . . . . . . .  C ADDR   0217H   A   
+OCHO. . . . . . . . . . . .  C ADDR   01E0H   A   
+OCHO1 . . . . . . . . . . .  C ADDR   0212H   A   
+P0. . . . . . . . . . . . .  D ADDR   0080H   A   
+P2. . . . . . . . . . . . .  D ADDR   00A0H   A   
+P3. . . . . . . . . . . . .  D ADDR   00B0H   A   
+PAUSE . . . . . . . . . . .  C ADDR   0268H   A   
+PAUSE1. . . . . . . . . . .  C ADDR   025CH   A   
+PAUSE2. . . . . . . . . . .  C ADDR   0260H   A   
+PAUSE3. . . . . . . . . . .  C ADDR   0264H   A   
+PAUSE_MENU. . . . . . . . .  C ADDR   0073H   A   
+PROYECTO. . . . . . . . . .  N NUMB   -----       
+REGRESAR_TIMER. . . . . . .  C ADDR   0065H   A   
+REINICIAR . . . . . . . . .  C ADDR   0239H   A   
+RESET . . . . . . . . . . .  C ADDR   0033H   A   
+RETA1 . . . . . . . . . . .  C ADDR   0087H   A   
+RETA2 . . . . . . . . . . .  C ADDR   008AH   A   
+RETARDO . . . . . . . . . .  C ADDR   0085H   A   
+SACAR_VALOR_DISPLAY_HORAS .  C ADDR   00BCH   A   
+SACAR_VALOR_DISPLAY_MINUTOS  C ADDR   00C6H   A   
+SEGUNDO . . . . . . . . . .  C ADDR   0060H   A   
+SEGUNDOS_CRON . . . . . . .  N NUMB   0037H   A   
+SEIS. . . . . . . . . . . .  C ADDR   01D6H   A   
+SEIS1 . . . . . . . . . . .  C ADDR   0208H   A   
+SIETE . . . . . . . . . . .  C ADDR   01DBH   A   
+SIETE1. . . . . . . . . . .  C ADDR   020DH   A   
+START . . . . . . . . . . .  C ADDR   0258H   A   
+START1. . . . . . . . . . .  C ADDR   024CH   A   
+START2. . . . . . . . . . .  C ADDR   0250H   A   
+START3. . . . . . . . . . .  C ADDR   0254H   A   
+STOP. . . . . . . . . . . .  C ADDR   0278H   A   
+STOP1 . . . . . . . . . . .  C ADDR   026CH   A   
+STOP2 . . . . . . . . . . .  C ADDR   0270H   A   
+STOP3 . . . . . . . . . . .  C ADDR   0274H   A   
+STOP_MENU . . . . . . . . .  C ADDR   007AH   A   
+TH0 . . . . . . . . . . . .  D ADDR   008CH   A   
+TIMER . . . . . . . . . . .  N NUMB   0020H   A   
+TL0 . . . . . . . . . . . .  D ADDR   008AH   A   
+TMOD. . . . . . . . . . . .  D ADDR   0089H   A   
+TOV0. . . . . . . . . . . .  C ADDR   005EH   A   
+TOV1. . . . . . . . . . . .  C ADDR   006AH   A   
+TOV2. . . . . . . . . . . .  C ADDR   006CH   A   
+TR0 . . . . . . . . . . . .  B ADDR   0088H.4 A   
+TRES. . . . . . . . . . . .  C ADDR   01C7H   A   
+TRES1 . . . . . . . . . . .  C ADDR   01F9H   A   
+UART. . . . . . . . . . . .  C ADDR   006BH   A   
+UNO . . . . . . . . . . . .  C ADDR   01BDH   A   
+UNO1. . . . . . . . . . . .  C ADDR   01EFH   A   
+
+
+REGISTER BANK(S) USED: 0 
+
+
+ASSEMBLY COMPLETE.  0 WARNING(S), 0 ERROR(S)

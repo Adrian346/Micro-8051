@@ -1,0 +1,174 @@
+NAME PROYECTORELOJ
+
+;***DECLARACION DE VARIABLES*******************
+;RELOJ
+SEG	EQU 030H
+MIN	EQU 031H
+HOR	EQU 032H
+
+UNS 	EQU 033H
+DES 	EQU 034H
+UNM 	EQU 035H
+DEM 	EQU 036H
+UNH 	EQU 037H
+DEH 	EQU 038H
+
+;OTRAS 
+
+VAR1	EQU 039H
+VAR2	EQU 03AH
+VAR3	EQU 03BH
+
+MINI	EQU 03CH
+HORI	EQU 03DH
+
+CONT1	EQU 03EH
+CONT2	EQU 03FH
+AUX 	EQU 040H
+
+TREH	EQU 041H
+
+
+;CRONOMETRO
+TIMER 	EQU 042H
+SEG_CRO	EQU 043H
+MIN_CRO	EQU 044H
+CRONO 	EQU 045H
+
+;***VECTOR DE INTERRUPCIONES*******************
+ORG	00H
+		AJMP	RESET
+	ORG	03H
+		AJMP	INTE0
+	ORG	0BH
+		AJMP	TOV0
+	ORG	13H
+		AJMP	INTE1
+	ORG	1BH
+		AJMP	TOV1
+	ORG	23H
+		AJMP	UART
+	ORG	2BH
+		AJMP	TOV2
+
+;***INICIO DEL PROGRAMA************************ 
+	ORG 50H
+	MOV SP, #60H
+RESET:
+	MOV TREH, #30h
+	ACALL INIT_LCD
+	MOV   	81h,#07h
+	MOV TH0, #0xD8		;Le asigna a TH0 D8 para el timer
+	MOV TL0, #0xCC		;Le asigna a TLO CC para el timer 	
+	MOV TMOD, #0x11		;Le asigna a TMOD 11 para el timer
+	SETB ET0
+	SETB EA
+	SETB TR0
+	MOV TIMER, #14		;Inicializa el timer en 14
+	MOV MIN_CRO, #00h
+	MOV SEG_CRO, #00h
+	MOV CRONO, #2
+	AJMP MENUP
+;***INICIO DE INTERRUPCIONES*******************
+INTE0:	RETI
+TOV0:	
+	;ACALL MENU_CRONOMETRO
+SEGUNDO:
+	;DJNZ TIMER, NO		;Mientras el timer sea diferente de 0 decrementa 1 y manda llamar a NO
+	;ACALL	AUMENTAR	;Timer llego a 0 y paso un seungo por lo tanto manda llamar a AUMENTAR donde incrementa un segundo
+REGRESAR_TIMER:			
+	MOV TIMER, #14		;A timer le vuelve a asignar el 14 para que empiece la cuenta otra vez y pase un segundo
+
+NO:	RETI
+INTE1:	RETI
+TOV1:	RETI
+UART:	RETI
+TOV2:	RETI
+
+;***MAIN***************************************
+MENUP:
+AJMP MENUP
+
+
+
+MAIN:
+;***RELOJ**************************************
+
+;***CRONOMETRO*********************************
+
+;***CAMBIO RELOJ*******************************
+
+;***ASCII**************************************
+
+;***BCD****************************************
+
+;***LCD****************************************
+;INICIAR LCD
+INIT_LCD: MOV R7, #3h
+FUN:   	MOV DPTR, #0F000H 
+   	MOV A, #38h	;FUNCTION SET
+   	MOVX @DPTR, A
+   	ACALL DELAY ;IMPLEMENTAR PARA 100Ms
+   	DJNZ R7, FUN
+        
+	MOV A, #0FH	;DISPLAY ON / OFF
+	MOVX @DPTR, A	
+	MOV A, #6H	;ENTRY MODE SET
+	MOVX @DPTR, A
+	MOV A, #14H
+	MOVX @DPTR, A	;CURSOR/DISPLAY SHIFT
+
+	RET
+;HOME LCD
+HOME:
+ 	MOV DPTR, #0F000H
+ 	MOV A, #02H ;HOME
+ 	MOVX @DPTR, A
+ 	CALL DELAY
+	RET
+;MANDAR LCD
+MANDARLCD:
+ CALL HOME
+ MOV DPTR, #0F100H
+
+ ;MINUTOS
+ MOV A, UNM
+ MOVX @DPTR, A
+ MOV R7,UNM
+ ACALL DELAY
+
+ MOV A, DEM
+ MOVX @DPTR, A
+ MOV R6,DEM
+ ACALL DELAY
+
+ ;******DOSPUNTOS
+ MOV A, #3Ah
+ MOVX @DPTR, A
+ ACALL DELAY
+ ;***************
+
+ ;SEGUNDOS
+ MOV A, UNS
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ MOV A, DES
+ MOVX @DPTR, A
+ ACALL DELAY
+
+ RET
+
+
+
+
+
+;*****************************************************
+DELAY:
+	MOV CONT1, #20	
+RETA1:	MOV	CONT2,#255
+RETA2:	DJNZ	CONT2,RETA2
+	DJNZ	CONT1,RETA1
+	RET
+
+END
